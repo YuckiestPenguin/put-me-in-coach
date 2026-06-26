@@ -85,6 +85,20 @@ class GameState extends ChangeNotifier {
 
   int get startersCount => roster.where((p) => p.onField).length;
 
+  /// Assign a role (goalie / captain / favorite). Each role is held by at most
+  /// one player, so turning it on for one clears it from everyone else. Tapping
+  /// the same player again turns it off.
+  void toggleRole(int number, PlayerRole role) {
+    final target = roster.firstWhere((p) => p.number == number);
+    final turningOn = !target.hasRole(role);
+    for (final p in roster) {
+      p.setRole(role, false);
+    }
+    target.setRole(role, turningOn);
+    _save();
+    notifyListeners();
+  }
+
   void startGame() {
     gameStarted = true;
     clockRunning = true;

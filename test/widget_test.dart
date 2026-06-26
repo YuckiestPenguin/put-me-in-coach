@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:put_me_in_coach/models/game_state.dart';
+import 'package:put_me_in_coach/models/player.dart';
 
 void main() {
   GameState freshGame() {
@@ -62,6 +63,28 @@ void main() {
     expect(g.roster.firstWhere((p) => p.number == 7).onField, false);
     expect(g.secondsUntilNextSub, 300); // counter reset on swap
     expect(g.fieldCount, 2); // still two on the field
+  });
+
+  test('a role is single-assignment — moving it clears the previous holder', () {
+    final g = freshGame();
+    g.toggleRole(7, PlayerRole.goalie);
+    expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, true);
+
+    // Assigning goalie to 10 must take it away from 7.
+    g.toggleRole(10, PlayerRole.goalie);
+    expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, false);
+    expect(g.roster.firstWhere((p) => p.number == 10).isGoalie, true);
+    expect(g.roster.where((p) => p.isGoalie).length, 1);
+
+    // Tapping the same player again clears the role entirely.
+    g.toggleRole(10, PlayerRole.goalie);
+    expect(g.roster.where((p) => p.isGoalie).length, 0);
+
+    // Roles are independent: captain and favorite can coexist on a player.
+    g.toggleRole(3, PlayerRole.captain);
+    g.toggleRole(3, PlayerRole.favorite);
+    final p3 = g.roster.firstWhere((p) => p.number == 3);
+    expect(p3.isCaptain && p3.isFavorite, true);
   });
 
   test('fairness sorting surfaces least-played on the bench', () {

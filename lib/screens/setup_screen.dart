@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/game_state.dart';
+import '../widgets/player_badges.dart';
+import '../widgets/player_role_sheet.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -115,7 +117,8 @@ class _SetupScreenState extends State<SetupScreen> {
             )
           else ...[
             Text(
-              'Tap a number to put it on the field to start.',
+              'Tap a number to put it on the field to start. '
+              'Long-press to set goalie 🧤, favorite ⭐, or captain C.',
               style: TextStyle(color: scheme.outline, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -124,20 +127,34 @@ class _SetupScreenState extends State<SetupScreen> {
               runSpacing: 8,
               children: [
                 for (final p in state.roster)
-                  InputChip(
-                    selected: p.onField,
-                    showCheckmark: true,
-                    label: Text(
-                      '${p.number}',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                  GestureDetector(
+                    onLongPress: () =>
+                        PlayerRoleSheet.show(context, state, p.number),
+                    child: InputChip(
+                      selected: p.onField,
+                      showCheckmark: true,
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${p.number}',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          if (p.isGoalie || p.isFavorite || p.isCaptain) ...[
+                            const SizedBox(width: 5),
+                            PlayerBadges(player: p, size: 15),
+                          ],
+                        ],
+                      ),
+                      selectedColor: scheme.primary,
+                      labelStyle: TextStyle(
+                        color:
+                            p.onField ? scheme.onPrimary : scheme.onSurface,
+                      ),
+                      onSelected: (_) => state.toggleStarter(p.number),
+                      onDeleted: () => state.removePlayer(p.number),
                     ),
-                    selectedColor: scheme.primary,
-                    labelStyle: TextStyle(
-                      color: p.onField ? scheme.onPrimary : scheme.onSurface,
-                    ),
-                    onSelected: (_) => state.toggleStarter(p.number),
-                    onDeleted: () => state.removePlayer(p.number),
                   ),
               ],
             ),

@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/game_state.dart';
 import '../services/alerts.dart';
 import '../util/format.dart';
+import '../widgets/player_badges.dart';
+import '../widgets/player_role_sheet.dart';
 import '../widgets/sub_flow_sheet.dart';
 
 class GameScreen extends StatefulWidget {
@@ -115,6 +117,8 @@ class _GameScreenState extends State<GameScreen> {
               itemBuilder: (_, i) {
                 final p = fieldList[i];
                 return ListTile(
+                  onTap: () =>
+                      PlayerRoleSheet.show(context, state, p.number),
                   leading: CircleAvatar(
                     backgroundColor:
                         p.onField ? scheme.primary : scheme.surfaceContainerHighest,
@@ -123,10 +127,18 @@ class _GameScreenState extends State<GameScreen> {
                     child: Text('${p.number}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(mmss(p.secondsPlayed),
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w600)),
-                  subtitle: Text('played'),
+                  title: Row(
+                    children: [
+                      Text(mmss(p.secondsPlayed),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w600)),
+                      if (p.isGoalie || p.isFavorite || p.isCaptain) ...[
+                        const SizedBox(width: 8),
+                        PlayerBadges(player: p, size: 20),
+                      ],
+                    ],
+                  ),
+                  subtitle: const Text('played'),
                   trailing: p.onField
                       ? Chip(
                           label: const Text('ON FIELD'),

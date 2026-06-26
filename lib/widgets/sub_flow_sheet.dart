@@ -4,6 +4,7 @@ import '../models/game_state.dart';
 import '../models/player.dart';
 import '../services/alerts.dart';
 import '../util/format.dart';
+import 'player_badges.dart';
 
 /// The two-step substitution flow shown as a modal sheet:
 ///   Step 1 — pick bench players to bring ON  (least-played surfaced first)
@@ -260,6 +261,10 @@ class _PlayerToggle extends StatelessWidget {
         ),
         child: Column(
           children: [
+            SizedBox(
+              height: 16,
+              child: PlayerBadges(player: player, size: 14),
+            ),
             Text(
               '${player.number}',
               style: TextStyle(
