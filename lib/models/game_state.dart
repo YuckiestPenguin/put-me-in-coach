@@ -31,6 +31,12 @@ class GameState extends ChangeNotifier {
   /// The game-second at which the sub counter last reset (game start or a swap).
   int lastAlertSecond = 0;
 
+  /// How many periods the game is split into (2 = halves, 4 = quarters, etc).
+  int periodCount = 2;
+
+  /// How long each period is, in minutes.
+  int periodMinutes = 25;
+
   /// Set by the UI; called from [tick] the moment a sub becomes due so the
   /// screen can chime, vibrate, and pop the swap sheet. Keeps plugins out of
   /// the model.
@@ -132,6 +138,59 @@ class GameState extends ChangeNotifier {
 
   void decrementTarget() {
     if (onFieldTarget > 1) onFieldTarget--;
+    _save();
+    notifyListeners();
+  }
+
+  // ---- Game format (periods) ---------------------------------------------
+
+  /// The word to use for a period given the current [periodCount] (Half,
+  /// Third, Quarter, or a generic Period for anything else).
+  String get periodLabel => switch (periodCount) {
+        2 => 'Half',
+        3 => 'Third',
+        4 => 'Quarter',
+        _ => 'Period',
+      };
+
+  int get periodLengthSeconds => periodMinutes * 60;
+
+  int get totalGameLengthSeconds => periodCount * periodLengthSeconds;
+
+  /// 1-based index of the period the game clock is currently in. Clamped to
+  /// [periodCount] so running past the scheduled length still shows the last
+  /// period rather than rolling into a nonexistent one.
+  int get currentPeriod =>
+      (gameSeconds ~/ periodLengthSeconds).clamp(0, periodCount - 1) + 1;
+
+  /// Seconds elapsed within the current period.
+  int get secondsIntoPeriod =>
+      gameSeconds - (currentPeriod - 1) * periodLengthSeconds;
+
+  /// Seconds remaining in the current period (0 once the game has run past
+  /// its scheduled length).
+  int get secondsLeftInPeriod =>
+      (periodLengthSeconds - secondsIntoPeriod).clamp(0, periodLengthSeconds);
+
+  void setPeriodCount(int count) {
+    if (count < 1) return;
+    periodCount = count;
+    _save();
+    notifyListeners();
+  }
+
+  void setPeriodMinutes(int minutes) {
+    if (minutes < 1) return;
+    periodMinutes = minutes;
+    _save();
+    notifyListeners();
+  }
+
+  int get subIntervalMinutes => (subIntervalSeconds / 60).round();
+
+  void setSubIntervalMinutes(int minutes) {
+    if (minutes < 1) return;
+    subIntervalSeconds = minutes * 60;
     _save();
     notifyListeners();
   }
@@ -242,6 +301,8 @@ class GameState extends ChangeNotifier {
         'gameSeconds': gameSeconds,
         'subIntervalSeconds': subIntervalSeconds,
         'lastAlertSecond': lastAlertSecond,
+        'periodCount': periodCount,
+        'periodMinutes': periodMinutes,
         'roster': roster.map((p) => p.toJson()).toList(),
       };
 
@@ -252,6 +313,8 @@ class GameState extends ChangeNotifier {
     gameSeconds = json['gameSeconds'] as int? ?? 0;
     subIntervalSeconds = json['subIntervalSeconds'] as int? ?? 300;
     lastAlertSecond = json['lastAlertSecond'] as int? ?? 0;
+    periodCount = json['periodCount'] as int? ?? 2;
+    periodMinutes = json['periodMinutes'] as int? ?? 25;
     roster
       ..clear()
       ..addAll(

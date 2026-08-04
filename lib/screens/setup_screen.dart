@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/game_state.dart';
 import '../widgets/player_badges.dart';
 import '../widgets/player_role_sheet.dart';
+import 'settings_screen.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -44,6 +45,15 @@ class _SetupScreenState extends State<SetupScreen> {
       appBar: AppBar(
         title: const Text('Put Me In, Coach'),
         backgroundColor: scheme.primaryContainer,
+        actions: [
+          IconButton(
+            tooltip: 'Game settings',
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

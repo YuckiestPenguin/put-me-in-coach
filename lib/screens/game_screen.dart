@@ -7,6 +7,7 @@ import '../util/format.dart';
 import '../widgets/player_badges.dart';
 import '../widgets/player_role_sheet.dart';
 import '../widgets/sub_flow_sheet.dart';
+import 'settings_screen.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -86,6 +87,11 @@ class _GameScreenState extends State<GameScreen> {
           PopupMenuButton<String>(
             onSelected: (v) {
               if (v == 'new') _confirmNewGame();
+              if (v == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              }
               if (v == 'fast') {
                 state.subIntervalSeconds =
                     state.subIntervalSeconds == 300 ? 20 : 300;
@@ -94,6 +100,8 @@ class _GameScreenState extends State<GameScreen> {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'new', child: Text('New game')),
+              const PopupMenuItem(
+                  value: 'settings', child: Text('Game settings')),
               PopupMenuItem(
                 value: 'fast',
                 child: Text(state.subIntervalSeconds == 300
@@ -180,6 +188,14 @@ class _ClockPanel extends StatelessWidget {
       child: Column(
         children: [
           Text(
+            '${state.periodLabel} ${state.currentPeriod} of ${state.periodCount}',
+            style: TextStyle(
+              color: scheme.outline,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          Text(
             mmss(state.gameSeconds),
             style: TextStyle(
               fontSize: 64,
@@ -188,6 +204,11 @@ class _ClockPanel extends StatelessWidget {
               color: scheme.onSurface,
             ),
           ),
+          Text(
+            '${mmss(state.secondsLeftInPeriod)} left in this ${state.periodLabel.toLowerCase()}',
+            style: TextStyle(color: scheme.outline, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
           Text(
             running
                 ? 'Next sub in ${mmss(state.secondsUntilNextSub)}'
