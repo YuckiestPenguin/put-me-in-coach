@@ -95,6 +95,19 @@ void main() {
     // 3 is on the bench with 0 minutes; it should be first to bring on.
     expect(g.benchSortedByLeastPlayed.first.number, 3);
     // 7 and 10 have the most time; either is a valid first take-off.
-    expect(g.fieldSortedByMostPlayed.first.secondsPlayed, 30);
+    expect(g.fieldSubCandidates.first.secondsPlayed, 30);
+  });
+
+  test('the goalie is exempt from take-off suggestions', () {
+    final g = freshGame();
+    g.toggleRole(7, PlayerRole.goalie); // 7 is on the field
+    for (var i = 0; i < 30; i++) {
+      g.tick();
+    }
+    // 7 is on the field but, as goalie, must not be a take-off candidate.
+    expect(g.fieldSubCandidates.any((p) => p.number == 7), false);
+    expect(g.fieldSubCandidates.map((p) => p.number), contains(10));
+    // The goalie is still reachable for deliberate keeper rotation.
+    expect(g.goalieOnField?.number, 7);
   });
 }

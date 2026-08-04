@@ -48,12 +48,21 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
   final Set<int> _on = {};
   final Set<int> _off = {};
 
+  /// When true, the (normally exempt) goalie is added to the take-off list so
+  /// the coach can deliberately rotate keepers.
+  bool _includeGoalie = false;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final bringingOn = _step == 1;
-    final players =
-        bringingOn ? widget.state.benchSortedByLeastPlayed : widget.state.fieldSortedByMostPlayed;
+    final goalie = widget.state.goalieOnField;
+    final players = bringingOn
+        ? widget.state.benchSortedByLeastPlayed
+        : [
+            ...widget.state.fieldSubCandidates,
+            if (_includeGoalie && goalie != null) goalie,
+          ];
     final selected = bringingOn ? _on : _off;
 
     return Padding(
@@ -96,7 +105,9 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
           Text(
             bringingOn
                 ? 'Subs who have played the least are first.'
-                : 'Players who have played the most are first.',
+                : (goalie != null
+                    ? 'Most-played first. The goalie 🧤 is exempt.'
+                    : 'Players who have played the most are first.'),
             style: TextStyle(color: scheme.outline, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -107,7 +118,9 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
               child: Text(
                 bringingOn
                     ? 'No players on the bench.'
-                    : 'No players on the field.',
+                    : (goalie != null
+                        ? 'Only the goalie is on the field.'
+                        : 'No players on the field.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: scheme.outline),
               ),
@@ -140,6 +153,17 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
                       ),
                   ],
                 ),
+              ),
+            ),
+
+          // Keepers are exempt by default; let the coach opt in to rotate them.
+          if (!bringingOn && goalie != null && !_includeGoalie)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _includeGoalie = true),
+                icon: const Text('🧤', style: TextStyle(fontSize: 16)),
+                label: Text('Rotate the goalie? Include #${goalie.number}'),
               ),
             ),
 

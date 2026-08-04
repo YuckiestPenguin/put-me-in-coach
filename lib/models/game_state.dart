@@ -148,10 +148,20 @@ class GameState extends ChangeNotifier {
     return list;
   }
 
-  /// Players currently on the field, most-played first (the best candidates to
-  /// give a rest).
-  List<Player> get fieldSortedByMostPlayed {
-    final list = roster.where((p) => p.onField).toList();
+  /// The goalie currently on the field, if there is one.
+  Player? get goalieOnField {
+    for (final p in roster) {
+      if (p.onField && p.isGoalie) return p;
+    }
+    return null;
+  }
+
+  /// Field players who are candidates to come off, most-played first. The
+  /// goalie is exempt — keepers aren't rotated on the 5-minute cadence — so
+  /// they're left out of the take-off suggestions (the sub sheet still lets you
+  /// rotate the goalie deliberately).
+  List<Player> get fieldSubCandidates {
+    final list = roster.where((p) => p.onField && !p.isGoalie).toList();
     list.sort((a, b) => b.secondsPlayed.compareTo(a.secondsPlayed));
     return list;
   }
