@@ -27,6 +27,10 @@ class GameState extends ChangeNotifier {
   /// [newGame], which immediately clears them for the next game.
   bool gameEnded = false;
 
+  /// Wall-clock start and end of the current game, for the summary.
+  DateTime? startedAt;
+  DateTime? endedAt;
+
   /// Total elapsed *game* seconds (frozen during breaks).
   int gameSeconds = 0;
 
@@ -165,6 +169,8 @@ class GameState extends ChangeNotifier {
 
   void startGame() {
     gameStarted = true;
+    startedAt = DateTime.now();
+    endedAt = null;
     clockRunning = true;
     gameSeconds = 0;
     lastAlertSecond = 0;
@@ -325,6 +331,7 @@ class GameState extends ChangeNotifier {
   void endGame() {
     clockRunning = false;
     gameEnded = true;
+    endedAt = DateTime.now();
     _timer?.cancel();
     _save();
     notifyListeners();
@@ -337,6 +344,8 @@ class GameState extends ChangeNotifier {
     gameStarted = false;
     clockRunning = false;
     gameEnded = false;
+    startedAt = null;
+    endedAt = null;
     gameSeconds = 0;
     lastAlertSecond = 0;
     for (final p in roster) {
@@ -379,6 +388,8 @@ class GameState extends ChangeNotifier {
         'gameStarted': gameStarted,
         'clockRunning': clockRunning,
         'gameEnded': gameEnded,
+        'startedAt': startedAt?.toIso8601String(),
+        'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
         'subIntervalSeconds': subIntervalSeconds,
         'lastAlertSecond': lastAlertSecond,
@@ -392,6 +403,8 @@ class GameState extends ChangeNotifier {
     gameStarted = json['gameStarted'] as bool? ?? false;
     clockRunning = json['clockRunning'] as bool? ?? false;
     gameEnded = json['gameEnded'] as bool? ?? false;
+    startedAt = DateTime.tryParse(json['startedAt'] as String? ?? '');
+    endedAt = DateTime.tryParse(json['endedAt'] as String? ?? '');
     gameSeconds = json['gameSeconds'] as int? ?? 0;
     subIntervalSeconds = json['subIntervalSeconds'] as int? ?? 300;
     lastAlertSecond = json['lastAlertSecond'] as int? ?? 0;

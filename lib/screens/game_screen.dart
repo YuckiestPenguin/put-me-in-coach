@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/game_state.dart';
 import '../services/alerts.dart';
 import '../util/format.dart';
+import '../widgets/game_summary_sheet.dart';
 import '../widgets/player_badges.dart';
 import '../widgets/player_role_sheet.dart';
 import '../widgets/sub_flow_sheet.dart';
@@ -92,6 +93,7 @@ class _GameScreenState extends State<GameScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               _state.endGame();
+              GameSummarySheet.show(context, _state);
             },
             child: const Text('End game'),
           ),
@@ -170,6 +172,7 @@ class _GameScreenState extends State<GameScreen> {
             onSelected: (v) {
               if (v == 'add') _showAddPlayerDialog();
               if (v == 'end') _confirmEndGame();
+              if (v == 'summary') GameSummarySheet.show(context, state);
               if (v == 'new') _confirmNewGame();
               if (v == 'settings') {
                 Navigator.of(context).push(
@@ -188,6 +191,9 @@ class _GameScreenState extends State<GameScreen> {
                   value: 'settings', child: Text('Game settings')),
               if (!state.gameEnded)
                 const PopupMenuItem(value: 'end', child: Text('End game')),
+              if (state.gameEnded)
+                const PopupMenuItem(
+                    value: 'summary', child: Text('Game summary')),
               const PopupMenuItem(value: 'new', child: Text('New game')),
               PopupMenuItem(
                 value: 'fast',
@@ -202,16 +208,20 @@ class _GameScreenState extends State<GameScreen> {
       body: Column(
         children: [
           if (state.gameEnded)
-            Container(
-              width: double.infinity,
-              color: scheme.errorContainer,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Text(
-                'Game ended — final playing times below',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: scheme.onErrorContainer,
-                  fontWeight: FontWeight.w600,
+            InkWell(
+              onTap: () => GameSummarySheet.show(context, state),
+              child: Container(
+                width: double.infinity,
+                color: scheme.errorContainer,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: Text(
+                  'Game ended — tap for summary',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: scheme.onErrorContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

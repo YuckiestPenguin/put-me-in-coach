@@ -217,6 +217,19 @@ void main() {
     expect(g.onFieldTarget, 3);
   });
 
+  test('game records start and end times and survives a reload', () {
+    final g = freshGame();
+    expect(g.startedAt, isNotNull);
+    expect(g.endedAt, null);
+    g.endGame();
+    expect(g.endedAt, isNotNull);
+    final g2 = GameState()..loadFromJson(g.toJson());
+    expect(g2.startedAt, g.startedAt);
+    expect(g2.endedAt, g.endedAt);
+    g.newGame();
+    expect(g.startedAt, null);
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));
