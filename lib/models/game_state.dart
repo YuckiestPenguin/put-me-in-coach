@@ -41,6 +41,40 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The signed-in user this device's local data belongs to. Lets us notice
+  /// when someone else signs in so their account never receives (or shows)
+  /// another coach's roster.
+  String? ownerUid;
+
+  /// Called when [uid] signs in. If the local data belongs to a different user
+  /// it is wiped first; data with no owner (saved before accounts existed) is
+  /// adopted. Detach cloud hooks before calling so the wipe isn't synced.
+  void adoptUser(String uid) {
+    if (ownerUid != null && ownerUid != uid) _resetLocalData();
+    ownerUid = uid;
+    _save();
+    notifyListeners();
+  }
+
+  /// Back to a factory-fresh state: no roster, no game, default settings.
+  void _resetLocalData() {
+    _timer?.cancel();
+    _timer = null;
+    roster.clear();
+    onFieldTarget = 7;
+    gameStarted = false;
+    clockRunning = false;
+    gameEnded = false;
+    settingUp = false;
+    startedAt = null;
+    endedAt = null;
+    gameSeconds = 0;
+    subIntervalSeconds = 300;
+    lastAlertSecond = 0;
+    periodCount = 2;
+    periodMinutes = 25;
+  }
+
   /// Wall-clock start and end of the current game, for the summary.
   DateTime? startedAt;
   DateTime? endedAt;
@@ -464,6 +498,7 @@ class GameState extends ChangeNotifier {
         'gameStarted': gameStarted,
         'clockRunning': clockRunning,
         'gameEnded': gameEnded,
+        'ownerUid': ownerUid,
         'startedAt': startedAt?.toIso8601String(),
         'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
@@ -479,6 +514,7 @@ class GameState extends ChangeNotifier {
     gameStarted = json['gameStarted'] as bool? ?? false;
     clockRunning = json['clockRunning'] as bool? ?? false;
     gameEnded = json['gameEnded'] as bool? ?? false;
+    ownerUid = json['ownerUid'] as String?;
     startedAt = DateTime.tryParse(json['startedAt'] as String? ?? '');
     endedAt = DateTime.tryParse(json['endedAt'] as String? ?? '');
     gameSeconds = json['gameSeconds'] as int? ?? 0;

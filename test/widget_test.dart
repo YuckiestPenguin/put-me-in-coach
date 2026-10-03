@@ -278,6 +278,26 @@ void main() {
     expect(g.roster.length, 3); // roster kept
   });
 
+  test('a different user signing in does not inherit the previous roster', () {
+    final g = freshGame();
+    var pushed = 0;
+    g.onRosterChanged = () => pushed++;
+    g.adoptUser('coachA'); // legacy local data is adopted, not wiped
+    expect(g.roster.length, 3);
+    expect(g.ownerUid, 'coachA');
+    g.adoptUser('coachA'); // same user again: untouched
+    expect(g.roster.length, 3);
+    g.onRosterChanged = null; // detached before the switch, as in main.dart
+    g.adoptUser('coachB');
+    expect(g.roster, isEmpty);
+    expect(g.gameStarted, false);
+    expect(g.ownerUid, 'coachB');
+    expect(pushed, 0);
+    // The owner survives a reload so the check works across app restarts.
+    final g2 = GameState()..loadFromJson(g.toJson());
+    expect(g2.ownerUid, 'coachB');
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));

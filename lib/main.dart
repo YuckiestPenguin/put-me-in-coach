@@ -51,8 +51,12 @@ class _CoachAppState extends State<CoachApp> {
     if (user?.uid == _syncedUid) return;
     _sync?.detach(state);
     _syncedUid = user?.uid;
-    _sync = user == null ? null : CloudSync(user.uid);
-    _sync?.attach(state);
+    _sync = null;
+    if (user == null) return;
+    // Detach first (above) so wiping another user's local data isn't synced.
+    state.adoptUser(user.uid);
+    _sync = CloudSync(user.uid);
+    _sync!.attach(state);
   }
 
   @override
