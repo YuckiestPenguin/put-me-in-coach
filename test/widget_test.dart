@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:put_me_in_coach/models/game_state.dart';
+import 'package:put_me_in_coach/models/league.dart';
 import 'package:put_me_in_coach/models/player.dart';
 
 void main() {
@@ -296,6 +297,32 @@ void main() {
     // The owner survives a reload so the check works across app restarts.
     final g2 = GameState()..loadFromJson(g.toJson());
     expect(g2.ownerUid, 'coachB');
+  });
+
+  test('league round-trips through json and describes itself', () {
+    final l = League(
+      name: 'Rec U10',
+      periodCount: 4,
+      periodMinutes: 12.5,
+      playersOnField: 7,
+      subIntervalMinutes: 6.5,
+      extraPlayerTrailingBy: 4,
+    );
+    final back = League.fromJson('abc', l.toJson());
+    expect(back.id, 'abc');
+    expect(back.name, 'Rec U10');
+    expect(back.periodCount, 4);
+    expect(back.extraPlayerTrailingBy, 4);
+    expect(back.totalMinutes, 50);
+    expect(back.periodMinutes, 12.5);
+    expect(back.summary,
+        '4 quarters × 12.5 min · 7 on field · sub every 6.5 min · extra player if down by more than 4');
+    // Missing fields fall back to sensible defaults.
+    // Older docs stored whole minutes as ints.
+    expect(League.fromJson('o', {'periodMinutes': 20}).periodMinutes, 20.0);
+    final bare = League.fromJson('x', {});
+    expect(bare.periodCount, 2);
+    expect(bare.extraPlayerTrailingBy, null);
   });
 
   test('goals can be added and undone', () {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/game_state.dart';
 import '../util/format.dart';
+import '../widgets/counter_row.dart';
 
 /// Lets the coach configure the game format: how many periods (halves,
 /// quarters, or a custom split) and how long each one is, plus the sub
@@ -59,14 +60,14 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _CounterRow(
+          CounterRow(
             label: 'Number of ${state.periodLabel.toLowerCase()}s',
             value: '${state.periodCount}',
             onDecrement: () => state.setPeriodCount(state.periodCount - 1),
             onIncrement: () => state.setPeriodCount(state.periodCount + 1),
           ),
           const SizedBox(height: 12),
-          _CounterRow(
+          CounterRow(
             label: '${state.periodLabel} length',
             value: '${state.periodMinutes} min',
             onDecrement: () => state.setPeriodMinutes(state.periodMinutes - 1),
@@ -80,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 28),
           Text('Sub reminders', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          _CounterRow(
+          CounterRow(
             label: 'Remind me to sub every',
             value: '${state.subIntervalMinutes} min',
             onDecrement: () =>
@@ -90,49 +91,6 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// A labeled value with +/- steppers, styled like the on-field-count control
-/// on the setup screen.
-class _CounterRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
-
-  const _CounterRow({
-    required this.label,
-    required this.value,
-    required this.onDecrement,
-    required this.onIncrement,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 16)),
-        ),
-        IconButton.filledTonal(
-          onPressed: onDecrement,
-          icon: const Icon(Icons.remove),
-        ),
-        SizedBox(
-          width: 72,
-          child: Text(
-            value,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-        IconButton.filledTonal(
-          onPressed: onIncrement,
-          icon: const Icon(Icons.add),
-        ),
-      ],
     );
   }
 }
