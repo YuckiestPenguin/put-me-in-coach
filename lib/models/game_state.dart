@@ -92,7 +92,7 @@ class GameState extends ChangeNotifier {
   int periodCount = 2;
 
   /// How long each period is, in minutes.
-  int periodMinutes = 25;
+  double periodMinutes = 25;
 
   /// Set by the UI; called from [tick] the moment a sub becomes due so the
   /// screen can chime, vibrate, and pop the swap sheet. Keeps plugins out of
@@ -271,7 +271,7 @@ class GameState extends ChangeNotifier {
         _ => 'Period',
       };
 
-  int get periodLengthSeconds => periodMinutes * 60;
+  int get periodLengthSeconds => (periodMinutes * 60).round();
 
   int get totalGameLengthSeconds => periodCount * periodLengthSeconds;
 
@@ -297,18 +297,18 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPeriodMinutes(int minutes) {
-    if (minutes < 1) return;
+  void setPeriodMinutes(double minutes) {
+    if (minutes < 0.5) return;
     periodMinutes = minutes;
     _save();
     notifyListeners();
   }
 
-  int get subIntervalMinutes => (subIntervalSeconds / 60).round();
+  double get subIntervalMinutes => subIntervalSeconds / 60;
 
-  void setSubIntervalMinutes(int minutes) {
-    if (minutes < 1) return;
-    subIntervalSeconds = minutes * 60;
+  void setSubIntervalMinutes(double minutes) {
+    if (minutes < 0.5) return;
+    subIntervalSeconds = (minutes * 60).round();
     _save();
     notifyListeners();
   }
@@ -521,7 +521,7 @@ class GameState extends ChangeNotifier {
     subIntervalSeconds = json['subIntervalSeconds'] as int? ?? 300;
     lastAlertSecond = json['lastAlertSecond'] as int? ?? 0;
     periodCount = json['periodCount'] as int? ?? 2;
-    periodMinutes = json['periodMinutes'] as int? ?? 25;
+    periodMinutes = (json['periodMinutes'] as num?)?.toDouble() ?? 25;
     roster
       ..clear()
       ..addAll(

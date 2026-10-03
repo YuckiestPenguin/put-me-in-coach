@@ -1,3 +1,5 @@
+import '../util/format.dart';
+
 /// A league's rules: how the game is structured and when subs are due. Saved in
 /// Firestore under `users/{uid}/leagues/{id}`.
 class League {
@@ -37,9 +39,7 @@ class League {
 
   double get totalMinutes => periodCount * periodMinutes;
 
-  /// Minutes without a trailing ".0": 25 -> "25", 7.5 -> "7.5".
-  static String fmtMinutes(double m) =>
-      m == m.roundToDouble() ? m.toInt().toString() : m.toString();
+  static String fmtMinutes(double m) => minutesText(m);
 
   /// e.g. "2 halves × 25 min · 7 on field · sub every 5 min".
   String get summary {

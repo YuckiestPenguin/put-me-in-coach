@@ -56,9 +56,9 @@ class CloudSync {
       ...League(
         name: 'Default',
         periodCount: state.periodCount,
-        periodMinutes: state.periodMinutes.toDouble(),
+        periodMinutes: state.periodMinutes,
         playersOnField: state.onFieldTarget,
-        subIntervalMinutes: state.subIntervalMinutes.toDouble(),
+        subIntervalMinutes: state.subIntervalMinutes,
       ).toJson(),
       'updatedAt': FieldValue.serverTimestamp(),
     });

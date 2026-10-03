@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:put_me_in_coach/models/game_state.dart';
 import 'package:put_me_in_coach/models/league.dart';
+import 'package:put_me_in_coach/util/format.dart';
 import 'package:put_me_in_coach/models/player.dart';
 
 void main() {
@@ -323,6 +324,22 @@ void main() {
     final bare = League.fromJson('x', {});
     expect(bare.periodCount, 2);
     expect(bare.extraPlayerTrailingBy, null);
+  });
+
+  test('period length and sub interval can be set in half minutes', () {
+    final g = GameState();
+    g.setPeriodMinutes(7.5);
+    expect(g.periodLengthSeconds, 450);
+    g.setPeriodMinutes(0.25); // below the half-minute floor: ignored
+    expect(g.periodMinutes, 7.5);
+    g.setSubIntervalMinutes(4.5);
+    expect(g.subIntervalSeconds, 270);
+    expect(g.subIntervalMinutes, 4.5);
+    // Old saves stored whole minutes as ints.
+    final g2 = GameState()..loadFromJson({'periodMinutes': 20});
+    expect(g2.periodMinutes, 20.0);
+    expect(minutesText(7.5), '7.5');
+    expect(minutesText(25), '25');
   });
 
   test('goals can be added and undone', () {

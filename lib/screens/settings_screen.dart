@@ -19,7 +19,7 @@ class SettingsScreen extends StatelessWidget {
     final state = context.watch<GameState>();
     final scheme = Theme.of(context).colorScheme;
     final isPreset = _presets.containsKey(state.periodCount);
-    final totalMinutes = state.periodCount * state.periodMinutes;
+    final totalSeconds = state.totalGameLengthSeconds;
 
     return Scaffold(
       appBar: AppBar(
@@ -69,13 +69,14 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           CounterRow(
             label: '${state.periodLabel} length',
-            value: '${state.periodMinutes} min',
-            onDecrement: () => state.setPeriodMinutes(state.periodMinutes - 1),
-            onIncrement: () => state.setPeriodMinutes(state.periodMinutes + 1),
+            value: '${minutesText(state.periodMinutes)} min',
+            onDecrement: () => state.setPeriodMinutes(state.periodMinutes - 0.5),
+            onIncrement: () => state.setPeriodMinutes(state.periodMinutes + 0.5),
           ),
           const SizedBox(height: 8),
           Text(
-            'Total game time: ${mmss(totalMinutes * 60)} ($totalMinutes min)',
+            'Total game time: ${mmss(totalSeconds)} '
+            '(${minutesText(totalSeconds / 60)} min)',
             style: TextStyle(color: scheme.outline, fontSize: 13),
           ),
           const SizedBox(height: 28),
@@ -83,11 +84,11 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           CounterRow(
             label: 'Remind me to sub every',
-            value: '${state.subIntervalMinutes} min',
+            value: '${minutesText(state.subIntervalMinutes)} min',
             onDecrement: () =>
-                state.setSubIntervalMinutes(state.subIntervalMinutes - 1),
+                state.setSubIntervalMinutes(state.subIntervalMinutes - 0.5),
             onIncrement: () =>
-                state.setSubIntervalMinutes(state.subIntervalMinutes + 1),
+                state.setSubIntervalMinutes(state.subIntervalMinutes + 0.5),
           ),
         ],
       ),

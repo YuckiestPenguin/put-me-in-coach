@@ -11,3 +11,7 @@ String clockTime(DateTime t) {
   final m = t.minute.toString().padLeft(2, '0');
   return '$h:$m ${t.hour < 12 ? 'AM' : 'PM'}';
 }
+
+/// Minutes without a trailing ".0": 25 -> "25", 7.5 -> "7.5".
+String minutesText(double m) =>
+    m == m.roundToDouble() ? m.toInt().toString() : m.toStringAsFixed(1);
