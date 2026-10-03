@@ -294,12 +294,15 @@ class GameState extends ChangeNotifier {
   }
 
   /// Apply a substitution: [onIds] come on, [offIds] go off. Resets the
-  /// sub counter so the next alert is a full interval away.
+  /// sub counter so the next alert is a full interval away. [offIds] may be
+  /// shorter than [onIds] (the league allows an extra player when trailing by
+  /// more than 4); the on-field target then grows to the new field count.
   void applySwap(List<int> onIds, List<int> offIds) {
     for (final p in roster) {
       if (onIds.contains(p.id)) p.onField = true;
       if (offIds.contains(p.id)) p.onField = false;
     }
+    if (fieldCount > onFieldTarget) onFieldTarget = fieldCount;
     lastAlertSecond = gameSeconds;
     _save();
     notifyListeners();

@@ -9,8 +9,8 @@ import 'player_badges.dart';
 /// The two-step substitution flow shown as a modal sheet:
 ///   Step 1 — pick bench players to bring ON  (least-played surfaced first)
 ///   Step 2 — pick field players to take OFF  (most-played surfaced first)
-/// Confirm applies the swap. Counts must match so the on-field number stays put;
-/// change the number itself with the +/- control on the game screen.
+/// Confirm applies the swap. Taking off fewer than came on is allowed (an extra
+/// player when trailing by more than 4); the on-field target grows to match.
 class SubFlowSheet extends StatefulWidget {
   final GameState state;
 
@@ -104,7 +104,8 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
           const SizedBox(height: 4),
           Text(
             bringingOn
-                ? 'Subs who have played the least are first.'
+                ? 'Subs who have played the least are first. You don\'t have to '
+                    'take anyone off.'
                 : (goalie != null
                     ? 'Most-played first. The goalie 🧤 is exempt.'
                     : 'Players who have played the most are first.'),
@@ -207,15 +208,25 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
       );
     }
 
-    final matched = _off.length == _on.length;
+    final matched = _off.length <= _on.length;
+    final extra = _on.length - _off.length;
     return Column(
       children: [
         if (!matched)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Pick ${_on.length} to take off (selected ${_off.length}).',
+              'Pick at most ${_on.length} to take off (selected ${_off.length}).',
               style: TextStyle(color: scheme.error, fontSize: 13),
+            ),
+          )
+        else if (extra > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Taking off ${_off.length} — $extra extra on the field '
+              '(allowed when trailing by more than 4).',
+              style: TextStyle(color: scheme.outline, fontSize: 13),
             ),
           ),
         Row(
@@ -242,7 +253,7 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Confirm Swap'),
+                child: Text(_off.isEmpty ? 'Add without taking off' : 'Confirm Swap'),
               ),
             ),
           ],

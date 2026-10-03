@@ -210,6 +210,13 @@ void main() {
     expect(g.roster.firstWhere((p) => p.number == 7).isPresent, true);
   });
 
+  test('a player can come on without anyone going off; target grows', () {
+    final g = freshGame();
+    g.applySwap([idOf(g, 3)], []);
+    expect(g.fieldCount, 3);
+    expect(g.onFieldTarget, 3);
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));
