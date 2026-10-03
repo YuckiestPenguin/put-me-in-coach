@@ -27,6 +27,20 @@ class GameState extends ChangeNotifier {
   /// [newGame], which immediately clears them for the next game.
   bool gameEnded = false;
 
+  /// True while the coach is on the setup screen (picking players, starters)
+  /// before a game. Not saved: reopening the app lands on the home screen.
+  bool settingUp = false;
+
+  void beginSetup() {
+    settingUp = true;
+    notifyListeners();
+  }
+
+  void cancelSetup() {
+    settingUp = false;
+    notifyListeners();
+  }
+
   /// Wall-clock start and end of the current game, for the summary.
   DateTime? startedAt;
   DateTime? endedAt;
@@ -173,6 +187,7 @@ class GameState extends ChangeNotifier {
 
   void startGame() {
     gameStarted = true;
+    settingUp = false;
     startedAt = DateTime.now();
     endedAt = null;
     clockRunning = true;
@@ -342,11 +357,20 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Leave the game screen for the home screen. Clears the current game
+  /// like [newGame] (the roster is kept); a finished game is already saved.
+  void goHome() {
+    newGame();
+    settingUp = false;
+    notifyListeners();
+  }
+
   /// Back to the setup screen, keeping the roster (names, roles) but clearing
   /// times/field/goals and resetting everyone to present — the coach only
   /// needs to mark exceptions for the next game.
   void newGame() {
     gameStarted = false;
+    settingUp = true;
     clockRunning = false;
     gameEnded = false;
     startedAt = null;

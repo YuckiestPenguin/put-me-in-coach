@@ -257,6 +257,27 @@ void main() {
     expect(g.roster.every((p) => p.secondsPlayed == 0 && p.isPresent), true);
   });
 
+  test('setup flow: home -> setup -> game; new game returns to setup', () {
+    final g = GameState();
+    expect(g.settingUp, false);
+    g.beginSetup();
+    expect(g.settingUp, true);
+    g.cancelSetup();
+    expect(g.settingUp, false);
+    final g2 = freshGame();
+    expect(g2.settingUp, false);
+    g2.newGame();
+    expect(g2.settingUp, true);
+  });
+
+  test('goHome leaves the game and lands on home, not setup', () {
+    final g = freshGame();
+    g.goHome();
+    expect(g.gameStarted, false);
+    expect(g.settingUp, false);
+    expect(g.roster.length, 3); // roster kept
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));

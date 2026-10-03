@@ -19,6 +19,19 @@ class CloudSync {
   CollectionReference<Map<String, dynamic>> get _games =>
       FirebaseFirestore.instance.collection('users/$uid/games');
 
+  /// Finished games, newest first. Includes games saved offline that haven't
+  /// reached the server yet.
+  Stream<List<({String id, Map<String, dynamic> data})>> gamesStream() =>
+      _games.orderBy('startedAt', descending: true).snapshots().map((s) => [
+            for (final d in s.docs) (id: d.id, data: d.data()),
+          ]);
+
+  Future<void> deleteGame(String id) async {
+    try {
+      await _games.doc(id).delete();
+    } catch (_) {}
+  }
+
   /// Connects [state] to the cloud. If this device has no roster yet but the
   /// cloud does (new device / reinstall), the cloud roster is loaded;
   /// otherwise this device's roster is what gets saved.

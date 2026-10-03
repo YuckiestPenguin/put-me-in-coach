@@ -51,6 +51,35 @@ class _GameScreenState extends State<GameScreen> {
     _sheetOpen = false;
   }
 
+  void _goHome() {
+    if (_state.gameEnded) {
+      _state.goHome();
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave this game?'),
+        content: const Text(
+            'The game in progress will be discarded and not saved to your '
+            'history. End the game first to save it.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _state.goHome();
+            },
+            child: const Text('Discard and go home'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _confirmNewGame() {
     showDialog<void>(
       context: context,
@@ -170,6 +199,7 @@ class _GameScreenState extends State<GameScreen> {
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) {
+              if (v == 'home') _goHome();
               if (v == 'add') _showAddPlayerDialog();
               if (v == 'end') _confirmEndGame();
               if (v == 'summary') GameSummarySheet.show(context, state);
@@ -186,6 +216,7 @@ class _GameScreenState extends State<GameScreen> {
               }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(value: 'home', child: Text('Home')),
               const PopupMenuItem(value: 'add', child: Text('Add player')),
               const PopupMenuItem(
                   value: 'settings', child: Text('Game settings')),

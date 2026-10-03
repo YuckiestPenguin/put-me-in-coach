@@ -3,29 +3,40 @@ import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../util/format.dart';
 
-/// Simple end-of-game recap: start/end time, then who played, for how long,
-/// and goals scored.
+/// Simple game recap: start/end time, then who played, for how long, and goals
+/// scored. Works from a summary map ([GameState.summaryJson] format) so it can
+/// show the game just finished or one loaded from history.
 class GameSummarySheet extends StatelessWidget {
-  final GameState state;
-  const GameSummarySheet({super.key, required this.state});
+  final Map<String, dynamic> summary;
+  const GameSummarySheet({super.key, required this.summary});
 
-  static Future<void> show(BuildContext context, GameState state) {
+  /// Summary of the game in progress / just ended.
+  static Future<void> show(BuildContext context, GameState state) =>
+      showSummary(context, state.summaryJson());
+
+  static Future<void> showSummary(
+      BuildContext context, Map<String, dynamic> summary) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => GameSummarySheet(state: state),
+      builder: (_) => GameSummarySheet(summary: summary),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final players = state.roster.where((p) => p.isPresent).toList()
-      ..sort((a, b) => b.secondsPlayed.compareTo(a.secondsPlayed));
-    final absent = state.roster.where((p) => !p.isPresent).toList();
-    final goals = players.fold<int>(0, (n, p) => n + p.goals);
-    final start = state.startedAt;
-    final end = state.endedAt;
+    final all = [
+      for (final p in (summary['players'] as List? ?? []))
+        Map<String, dynamic>.from(p as Map)
+    ];
+    final players = all.where((p) => p['present'] != false).toList()
+      ..sort((a, b) => (b['secondsPlayed'] as int? ?? 0)
+          .compareTo(a['secondsPlayed'] as int? ?? 0));
+    final absent = all.where((p) => p['present'] == false).toList();
+    final goals = players.fold<int>(0, (n, p) => n + (p['goals'] as int? ?? 0));
+    final start = DateTime.tryParse(summary['startedAt'] as String? ?? '');
+    final end = DateTime.tryParse(summary['endedAt'] as String? ?? '');
 
     return SafeArea(
       child: Padding(
@@ -41,7 +52,7 @@ class GameSummarySheet extends StatelessWidget {
               [
                 if (start != null) 'Started ${clockTime(start)}',
                 if (end != null) 'Ended ${clockTime(end)}',
-                'Game clock ${mmss(state.gameSeconds)}',
+                'Game clock ${mmss(summary['gameSeconds'] as int? ?? 0)}',
               ].join(' · '),
               style: TextStyle(color: scheme.outline),
             ),
@@ -59,11 +70,11 @@ class GameSummarySheet extends StatelessWidget {
                     for (final p in players)
                       _row(
                         context,
-                        p.number == null
-                            ? p.displayName
-                            : '${p.number} · ${p.displayName}',
-                        mmss(p.secondsPlayed),
-                        p.goals == 0 ? '–' : '${p.goals}',
+                        p['number'] == null
+                            ? '${p['name']}'
+                            : '${p['number']} · ${p['name']}',
+                        mmss(p['secondsPlayed'] as int? ?? 0),
+                        (p['goals'] as int? ?? 0) == 0 ? '–' : '${p['goals']}',
                       ),
                     _row(context, 'Total goals', '', '$goals', header: true),
                   ],
@@ -73,7 +84,7 @@ class GameSummarySheet extends StatelessWidget {
             if (absent.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                'Absent: ${absent.map((p) => p.displayName).join(', ')}',
+                'Absent: ${absent.map((p) => p['name']).join(', ')}',
                 style: TextStyle(color: scheme.outline, fontSize: 13),
               ),
             ],

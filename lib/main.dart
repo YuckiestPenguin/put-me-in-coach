@@ -8,6 +8,7 @@ import 'firebase/firebase_options_prod.dart';
 import 'models/game_state.dart';
 import 'services/cloud_sync.dart';
 import 'services/persistence.dart';
+import 'screens/home_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/game_screen.dart';
@@ -79,8 +80,11 @@ class _CoachAppState extends State<CoachApp> {
               .addPostFrameCallback((_) => _onUser(state, user));
           if (user == null) return const SignInScreen();
           return Consumer<GameState>(
-            builder: (context, state, _) =>
-                state.gameStarted ? const GameScreen() : const SetupScreen(),
+            builder: (context, state, _) => state.gameStarted
+                ? const GameScreen()
+                : state.settingUp
+                    ? const SetupScreen()
+                    : const HomeScreen(),
           );
         },
       ),

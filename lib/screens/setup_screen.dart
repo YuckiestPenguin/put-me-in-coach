@@ -52,6 +52,7 @@ class _SetupScreenState extends State<SetupScreen> {
       appBar: AppBar(
         title: const Text('Put Me In, Coach'),
         backgroundColor: scheme.primaryContainer,
+        leading: BackButton(onPressed: state.cancelSetup),
         actions: [
           IconButton(
             tooltip: 'Game settings',
