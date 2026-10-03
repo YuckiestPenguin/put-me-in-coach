@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -27,6 +28,20 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_circle),
+            title: Text(FirebaseAuth.instance.currentUser?.email ?? 'Signed in'),
+            trailing: TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                FirebaseAuth.instance.signOut();
+              },
+              child: const Text('Sign out'),
+            ),
+          ),
+          const Divider(),
+          const SizedBox(height: 8),
           Text('Game format', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(

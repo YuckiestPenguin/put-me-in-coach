@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "dev": "put-me-in-coach-dev",
+    "prod": "put-me-in-coach-prod"
+  }
+}

@@ -230,6 +230,33 @@ void main() {
     expect(g.startedAt, null);
   });
 
+  test('cloud hooks fire for roster edits and end of game, not for ticks', () {
+    final g = freshGame();
+    var rosterCalls = 0;
+    Map<String, dynamic>? summary;
+    g.onRosterChanged = () => rosterCalls++;
+    g.onGameEnded = (s) => summary = s;
+    g.tick();
+    expect(rosterCalls, 0);
+    g.addPlayer('New');
+    g.toggleRole(idOf(g, 7), PlayerRole.captain);
+    expect(rosterCalls, 2);
+    g.endGame();
+    expect(summary!['players'], hasLength(4));
+    expect(summary!['gameSeconds'], 1);
+  });
+
+  test('cloud roster loads as a fresh team', () {
+    final g = GameState();
+    g.loadTeamFromJson([
+      {'id': 2, 'name': 'Zed', 'number': 9, 'isGoalie': true},
+      {'id': 1, 'name': 'Amy'},
+    ]);
+    expect(g.roster.map((p) => p.name), ['Amy', 'Zed']);
+    expect(g.roster.last.isGoalie, true);
+    expect(g.roster.every((p) => p.secondsPlayed == 0 && p.isPresent), true);
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));

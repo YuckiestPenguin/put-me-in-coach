@@ -87,6 +87,7 @@ class GameState extends ChangeNotifier {
     if (number != null && (number < 0 || hasNumber(number))) return;
     roster.add(Player(id: _nextId(), name: trimmed, number: number));
     _sortRoster();
+    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -96,6 +97,7 @@ class GameState extends ChangeNotifier {
 
   void removePlayer(int id) {
     roster.removeWhere((p) => p.id == id);
+    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -112,6 +114,7 @@ class GameState extends ChangeNotifier {
     p.name = trimmed;
     p.number = number;
     _sortRoster();
+    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -163,6 +166,7 @@ class GameState extends ChangeNotifier {
       p.setRole(role, false);
     }
     target.setRole(role, turningOn);
+    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -334,6 +338,7 @@ class GameState extends ChangeNotifier {
     endedAt = DateTime.now();
     _timer?.cancel();
     _save();
+    onGameEnded?.call(summaryJson());
     notifyListeners();
   }
 
@@ -378,6 +383,53 @@ class GameState extends ChangeNotifier {
   }
 
   // ---- Persistence (wired in main.dart) ----------------------------------
+
+  /// Called when the roster itself changes (add/remove/edit/roles) so it can
+  /// be synced to the cloud. Deliberately not fired by clock ticks.
+  void Function()? onRosterChanged;
+
+  /// Called once when a game ends, with its summary, so it can be stored.
+  void Function(Map<String, dynamic> summary)? onGameEnded;
+
+  /// Roster as team data (no per-game state like time or goals).
+  List<Map<String, dynamic>> rosterToTeamJson() => [
+        for (final p in roster)
+          {
+            'id': p.id,
+            'name': p.name,
+            'number': p.number,
+            'isGoalie': p.isGoalie,
+            'isFavorite': p.isFavorite,
+            'isCaptain': p.isCaptain,
+          }
+      ];
+
+  /// Replace the roster with team data from the cloud (fresh per-game state).
+  void loadTeamFromJson(List<dynamic> players) {
+    roster
+      ..clear()
+      ..addAll(players.map((e) => Player.fromJson(e as Map<String, dynamic>)));
+    _sortRoster();
+    _save();
+    notifyListeners();
+  }
+
+  /// A plain-data record of the finished game.
+  Map<String, dynamic> summaryJson() => {
+        'startedAt': startedAt?.toIso8601String(),
+        'endedAt': endedAt?.toIso8601String(),
+        'gameSeconds': gameSeconds,
+        'players': [
+          for (final p in roster)
+            {
+              'name': p.name,
+              'number': p.number,
+              'present': p.isPresent,
+              'secondsPlayed': p.secondsPlayed,
+              'goals': p.goals,
+            }
+        ],
+      };
 
   /// Injected saver, so the model itself stays free of shared_preferences.
   Future<void> Function(GameState state)? saver;
