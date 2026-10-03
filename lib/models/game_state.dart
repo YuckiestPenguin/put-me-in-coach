@@ -22,6 +22,11 @@ class GameState extends ChangeNotifier {
   /// water breaks, etc.) — there is no special halftime concept.
   bool clockRunning = false;
 
+  /// True once the coach ends the game. Freezes the clock and turns off sub
+  /// alerts while leaving final playing times on screen for review — unlike
+  /// [newGame], which immediately clears them for the next game.
+  bool gameEnded = false;
+
   /// Total elapsed *game* seconds (frozen during breaks).
   int gameSeconds = 0;
 
@@ -67,23 +72,61 @@ class GameState extends ChangeNotifier {
 
   bool hasNumber(int number) => roster.any((p) => p.number == number);
 
-  void addPlayer(int number) {
-    if (number <= 0 || hasNumber(number)) return;
-    roster.add(Player(number: number));
-    roster.sort((a, b) => a.number.compareTo(b.number));
+  int _nextId() =>
+      roster.fold<int>(0, (m, p) => p.id > m ? p.id : m) + 1;
+
+  /// Add a player. Name is required (blank is rejected); number is optional
+  /// but must be unique among players that have one.
+  void addPlayer(String name, {int? number}) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    if (number != null && (number < 0 || hasNumber(number))) return;
+    roster.add(Player(id: _nextId(), name: trimmed, number: number));
+    _sortRoster();
     _save();
     notifyListeners();
   }
 
-  void removePlayer(int number) {
-    roster.removeWhere((p) => p.number == number);
+  void _sortRoster() => roster
+      .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+  void removePlayer(int id) {
+    roster.removeWhere((p) => p.id == id);
     _save();
     notifyListeners();
   }
 
-  /// In setup, toggle whether a number starts the game on the field.
-  void toggleStarter(int number) {
-    final p = roster.firstWhere((p) => p.number == number);
+  /// Update a player's name (must be non-blank) and optional number. A number
+  /// already held by someone else is ignored.
+  void editPlayer(int id, String name, int? number) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final p = roster.firstWhere((p) => p.id == id);
+    if (number != null && roster.any((o) => o.id != id && o.number == number)) {
+      return;
+    }
+    p.name = trimmed;
+    p.number = number;
+    _sortRoster();
+    _save();
+    notifyListeners();
+  }
+
+  /// Mark whether a player showed up for the current game. Marking someone
+  /// absent also benches them — they can't be absent and on the field.
+  void setPresent(int id, bool present) {
+    final p = roster.firstWhere((p) => p.id == id);
+    p.isPresent = present;
+    if (!present) p.onField = false;
+    _save();
+    notifyListeners();
+  }
+
+  /// In setup, toggle whether a player starts the game on the field. A no-op
+  /// for absent players — they can't be selected as a starter.
+  void toggleStarter(int id) {
+    final p = roster.firstWhere((p) => p.id == id);
+    if (!p.isPresent) return;
     p.onField = !p.onField;
     _save();
     notifyListeners();
@@ -91,11 +134,26 @@ class GameState extends ChangeNotifier {
 
   int get startersCount => roster.where((p) => p.onField).length;
 
+  void addGoal(int id) {
+    final p = roster.firstWhere((p) => p.id == id);
+    p.goals++;
+    _save();
+    notifyListeners();
+  }
+
+  /// Undo the most recently added goal for a player (corrects a mistaken tap).
+  void undoGoal(int id) {
+    final p = roster.firstWhere((p) => p.id == id);
+    if (p.goals > 0) p.goals--;
+    _save();
+    notifyListeners();
+  }
+
   /// Assign a role (goalie / captain / favorite). Each role is held by at most
   /// one player, so turning it on for one clears it from everyone else. Tapping
   /// the same player again turns it off.
-  void toggleRole(int number, PlayerRole role) {
-    final target = roster.firstWhere((p) => p.number == number);
+  void toggleRole(int id, PlayerRole role) {
+    final target = roster.firstWhere((p) => p.id == id);
     final turningOn = !target.hasRole(role);
     for (final p in roster) {
       p.setRole(role, false);
@@ -112,6 +170,7 @@ class GameState extends ChangeNotifier {
     lastAlertSecond = 0;
     for (final p in roster) {
       p.secondsPlayed = 0;
+      p.goals = 0;
     }
     _startTimer();
     _save();
@@ -200,9 +259,10 @@ class GameState extends ChangeNotifier {
   int get fieldCount => roster.where((p) => p.onField).length;
 
   /// Players currently on the bench, least-played first (the best candidates
-  /// to bring on for fair playing time).
+  /// to bring on for fair playing time). Absent players are excluded — they
+  /// aren't at the game, so they're not sub candidates.
   List<Player> get benchSortedByLeastPlayed {
-    final list = roster.where((p) => !p.onField).toList();
+    final list = roster.where((p) => !p.onField && p.isPresent).toList();
     list.sort((a, b) => a.secondsPlayed.compareTo(b.secondsPlayed));
     return list;
   }
@@ -225,19 +285,20 @@ class GameState extends ChangeNotifier {
     return list;
   }
 
-  /// Whole roster, least-played first — the fairness view.
+  /// Present roster, least-played first — the fairness view shown during a
+  /// game. Absent players sat this one out, so they're left off.
   List<Player> get rosterByLeastPlayed {
-    final list = [...roster];
+    final list = roster.where((p) => p.isPresent).toList();
     list.sort((a, b) => a.secondsPlayed.compareTo(b.secondsPlayed));
     return list;
   }
 
-  /// Apply a substitution: [onNumbers] come on, [offNumbers] go off. Resets the
+  /// Apply a substitution: [onIds] come on, [offIds] go off. Resets the
   /// sub counter so the next alert is a full interval away.
-  void applySwap(List<int> onNumbers, List<int> offNumbers) {
+  void applySwap(List<int> onIds, List<int> offIds) {
     for (final p in roster) {
-      if (onNumbers.contains(p.number)) p.onField = true;
-      if (offNumbers.contains(p.number)) p.onField = false;
+      if (onIds.contains(p.id)) p.onField = true;
+      if (offIds.contains(p.id)) p.onField = false;
     }
     lastAlertSecond = gameSeconds;
     _save();
@@ -253,17 +314,33 @@ class GameState extends ChangeNotifier {
   int get secondsUntilNextSub =>
       (subIntervalSeconds - (gameSeconds - lastAlertSecond)).clamp(0, subIntervalSeconds);
 
-  // ---- New game ----------------------------------------------------------
+  // ---- Ending / new game --------------------------------------------------
 
-  /// Back to the setup screen, keeping the roster but clearing times/field.
+  /// Stop the game for good: freezes the clock and stops sub alerts, but
+  /// leaves the roster and final playing times on screen so the coach can
+  /// review them. Call [newGame] afterward to reset for the next game.
+  void endGame() {
+    clockRunning = false;
+    gameEnded = true;
+    _timer?.cancel();
+    _save();
+    notifyListeners();
+  }
+
+  /// Back to the setup screen, keeping the roster (names, roles) but clearing
+  /// times/field/goals and resetting everyone to present — the coach only
+  /// needs to mark exceptions for the next game.
   void newGame() {
     gameStarted = false;
     clockRunning = false;
+    gameEnded = false;
     gameSeconds = 0;
     lastAlertSecond = 0;
     for (final p in roster) {
       p.secondsPlayed = 0;
       p.onField = false;
+      p.isPresent = true;
+      p.goals = 0;
     }
     _timer?.cancel();
     _save();
@@ -279,7 +356,7 @@ class GameState extends ChangeNotifier {
 
   /// Re-arm the timer after restoring a saved in-progress game.
   void resumeTimerIfNeeded() {
-    if (gameStarted && _timer == null) _startTimer();
+    if (gameStarted && !gameEnded && _timer == null) _startTimer();
   }
 
   @override
@@ -298,6 +375,7 @@ class GameState extends ChangeNotifier {
         'onFieldTarget': onFieldTarget,
         'gameStarted': gameStarted,
         'clockRunning': clockRunning,
+        'gameEnded': gameEnded,
         'gameSeconds': gameSeconds,
         'subIntervalSeconds': subIntervalSeconds,
         'lastAlertSecond': lastAlertSecond,
@@ -310,6 +388,7 @@ class GameState extends ChangeNotifier {
     onFieldTarget = json['onFieldTarget'] as int? ?? 7;
     gameStarted = json['gameStarted'] as bool? ?? false;
     clockRunning = json['clockRunning'] as bool? ?? false;
+    gameEnded = json['gameEnded'] as bool? ?? false;
     gameSeconds = json['gameSeconds'] as int? ?? 0;
     subIntervalSeconds = json['subIntervalSeconds'] as int? ?? 300;
     lastAlertSecond = json['lastAlertSecond'] as int? ?? 0;

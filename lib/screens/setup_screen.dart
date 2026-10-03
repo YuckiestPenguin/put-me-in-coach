@@ -15,23 +15,30 @@ class SetupScreen extends StatefulWidget {
 }
 
 class _SetupScreenState extends State<SetupScreen> {
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
+  final _numberController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _numberFocus = FocusNode();
+  final _nameFocus = FocusNode();
 
   @override
   void dispose() {
-    _controller.dispose();
-    _focus.dispose();
+    _numberController.dispose();
+    _nameController.dispose();
+    _numberFocus.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
   void _add(GameState state) {
-    final n = int.tryParse(_controller.text.trim());
-    if (n != null) {
-      state.addPlayer(n);
+    if (_nameController.text.trim().isEmpty) {
+      _nameFocus.requestFocus();
+      return;
     }
-    _controller.clear();
-    _focus.requestFocus();
+    state.addPlayer(_nameController.text,
+        number: int.tryParse(_numberController.text.trim()));
+    _numberController.clear();
+    _nameController.clear();
+    _nameFocus.requestFocus();
   }
 
   @override
@@ -88,16 +95,27 @@ class _SetupScreenState extends State<SetupScreen> {
           // --- Add players ---------------------------------------------
           Text('Roster', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
+          TextField(
+            controller: _nameController,
+            focusNode: _nameFocus,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _numberFocus.requestFocus(),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
-                  controller: _controller,
-                  focusNode: _focus,
+                  controller: _numberController,
+                  focusNode: _numberFocus,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: const InputDecoration(
-                    labelText: 'Player number',
+                    labelText: 'Number (optional)',
                     border: OutlineInputBorder(),
                   ),
                   onSubmitted: (_) => _add(state),
@@ -120,15 +138,16 @@ class _SetupScreenState extends State<SetupScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
-                'Add your players by number to get started.',
+                'Add your players by name to get started.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: scheme.outline),
               ),
             )
           else ...[
             Text(
-              'Tap a number to put it on the field to start. '
-              'Long-press to set goalie 🧤, favorite ⭐, or captain C.',
+              'Tap a player to start them on the field (green) or leave them '
+              'on the bench (yellow). Long-press to mark absent, rename, or '
+              'set goalie 🧤, favorite ⭐, or captain C.',
               style: TextStyle(color: scheme.outline, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -139,17 +158,20 @@ class _SetupScreenState extends State<SetupScreen> {
                 for (final p in state.roster)
                   GestureDetector(
                     onLongPress: () =>
-                        PlayerRoleSheet.show(context, state, p.number),
+                        PlayerRoleSheet.show(context, state, p.id),
                     child: InputChip(
+                      isEnabled: p.isPresent,
                       selected: p.onField,
                       showCheckmark: true,
                       label: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${p.number}',
+                            p.number == null
+                                ? p.displayName
+                                : '${p.number} · ${p.displayName}',
                             style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           if (p.isGoalie || p.isFavorite || p.isCaptain) ...[
                             const SizedBox(width: 5),
@@ -157,13 +179,12 @@ class _SetupScreenState extends State<SetupScreen> {
                           ],
                         ],
                       ),
-                      selectedColor: scheme.primary,
-                      labelStyle: TextStyle(
-                        color:
-                            p.onField ? scheme.onPrimary : scheme.onSurface,
-                      ),
-                      onSelected: (_) => state.toggleStarter(p.number),
-                      onDeleted: () => state.removePlayer(p.number),
+                      selectedColor: const Color(0xFFA5D6A7), // light green
+                      backgroundColor:
+                          p.isPresent ? const Color(0xFFFFF59D) : null, // yellow
+                      labelStyle: const TextStyle(color: Colors.black87),
+                      onSelected: (_) => state.toggleStarter(p.id),
+                      onDeleted: () => state.removePlayer(p.id),
                     ),
                   ),
               ],

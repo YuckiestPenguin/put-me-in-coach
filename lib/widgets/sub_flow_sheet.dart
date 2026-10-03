@@ -138,15 +138,15 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
                     for (final p in players)
                       _PlayerToggle(
                         player: p,
-                        selected: selected.contains(p.number),
+                        selected: selected.contains(p.id),
                         accent: bringingOn ? scheme.primary : scheme.error,
                         onTap: () {
                           Alerts.tap();
                           setState(() {
-                            if (selected.contains(p.number)) {
-                              selected.remove(p.number);
+                            if (selected.contains(p.id)) {
+                              selected.remove(p.id);
                             } else {
-                              selected.add(p.number);
+                              selected.add(p.id);
                             }
                           });
                         },
@@ -163,7 +163,7 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
               child: TextButton.icon(
                 onPressed: () => setState(() => _includeGoalie = true),
                 icon: const Text('🧤', style: TextStyle(fontSize: 16)),
-                label: Text('Rotate the goalie? Include #${goalie.number}'),
+                label: Text('Rotate the goalie? Include ${goalie.displayName}'),
               ),
             ),
 
@@ -252,7 +252,7 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
   }
 }
 
-/// A large number tile used inside the sub flow.
+/// A large player tile used inside the sub flow.
 class _PlayerToggle extends StatelessWidget {
   final Player player;
   final bool selected;
@@ -273,8 +273,8 @@ class _PlayerToggle extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 88,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        width: 96,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
           color: selected ? accent : scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
@@ -290,9 +290,11 @@ class _PlayerToggle extends StatelessWidget {
               child: PlayerBadges(player: player, size: 14),
             ),
             Text(
-              '${player.number}',
+              player.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: selected ? scheme.onPrimary : scheme.onSurface,
               ),

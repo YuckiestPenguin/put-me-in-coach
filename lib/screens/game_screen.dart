@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/game_state.dart';
@@ -73,6 +74,87 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  void _confirmEndGame() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End game?'),
+        content: const Text(
+            'This stops the clock and sub reminders for good. Final playing '
+            'times stay on screen to review — start "New game" when ready for '
+            'the next one.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _state.endGame();
+            },
+            child: const Text('End game'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddPlayerDialog() {
+    final nameController = TextEditingController();
+    final numberController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add player'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: numberController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Number (optional)',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) =>
+                  _submitAddPlayer(ctx, nameController, numberController),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                _submitAddPlayer(ctx, nameController, numberController),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submitAddPlayer(BuildContext ctx, TextEditingController name,
+      TextEditingController number) {
+    if (name.text.trim().isEmpty) return;
+    _state.addPlayer(name.text, number: int.tryParse(number.text.trim()));
+    Navigator.pop(ctx);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<GameState>();
@@ -86,6 +168,8 @@ class _GameScreenState extends State<GameScreen> {
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) {
+              if (v == 'add') _showAddPlayerDialog();
+              if (v == 'end') _confirmEndGame();
               if (v == 'new') _confirmNewGame();
               if (v == 'settings') {
                 Navigator.of(context).push(
@@ -99,9 +183,12 @@ class _GameScreenState extends State<GameScreen> {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'new', child: Text('New game')),
+              const PopupMenuItem(value: 'add', child: Text('Add player')),
               const PopupMenuItem(
                   value: 'settings', child: Text('Game settings')),
+              if (!state.gameEnded)
+                const PopupMenuItem(value: 'end', child: Text('End game')),
+              const PopupMenuItem(value: 'new', child: Text('New game')),
               PopupMenuItem(
                 value: 'fast',
                 child: Text(state.subIntervalSeconds == 300
@@ -114,6 +201,20 @@ class _GameScreenState extends State<GameScreen> {
       ),
       body: Column(
         children: [
+          if (state.gameEnded)
+            Container(
+              width: double.infinity,
+              color: scheme.errorContainer,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: Text(
+                'Game ended — final playing times below',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scheme.onErrorContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           _ClockPanel(state: state),
           const Divider(height: 1),
           _FieldCountBar(state: state),
@@ -126,18 +227,18 @@ class _GameScreenState extends State<GameScreen> {
                 final p = fieldList[i];
                 return ListTile(
                   onTap: () =>
-                      PlayerRoleSheet.show(context, state, p.number),
+                      PlayerRoleSheet.show(context, state, p.id),
                   leading: CircleAvatar(
-                    backgroundColor:
-                        p.onField ? scheme.primary : scheme.surfaceContainerHighest,
-                    foregroundColor:
-                        p.onField ? scheme.onPrimary : scheme.onSurface,
-                    child: Text('${p.number}',
+                    backgroundColor: p.onField
+                        ? const Color(0xFFA5D6A7) // light green: on field
+                        : const Color(0xFFFFF59D), // yellow: on bench
+                    foregroundColor: Colors.black87,
+                    child: Text(p.badgeText,
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                   title: Row(
                     children: [
-                      Text(mmss(p.secondsPlayed),
+                      Text(p.displayName,
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w600)),
                       if (p.isGoalie || p.isFavorite || p.isCaptain) ...[
@@ -146,28 +247,36 @@ class _GameScreenState extends State<GameScreen> {
                       ],
                     ],
                   ),
-                  subtitle: const Text('played'),
-                  trailing: p.onField
-                      ? Chip(
-                          label: const Text('ON FIELD'),
-                          backgroundColor: scheme.primaryContainer,
-                          visualDensity: VisualDensity.compact,
-                        )
-                      : Chip(
-                          label: const Text('bench'),
-                          visualDensity: VisualDensity.compact,
-                        ),
+                  subtitle: Text(
+                      '${mmss(p.secondsPlayed)} played · ${p.onField ? 'on field' : 'bench'}'),
+                  trailing: GestureDetector(
+                    onLongPress: () => state.undoGoal(p.id),
+                    child: Badge(
+                      label: Text('${p.goals}'),
+                      isLabelVisible: p.goals > 0,
+                      child: IconButton(
+                        tooltip: 'Goal! (long-press to undo)',
+                        onPressed: () {
+                          Alerts.tap();
+                          state.addGoal(p.id);
+                        },
+                        icon: const Text('⚽', style: TextStyle(fontSize: 22)),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openSubSheet(triggeredByAlert: false),
-        icon: const Icon(Icons.swap_horiz),
-        label: const Text('Make Sub'),
-      ),
+      floatingActionButton: state.gameEnded
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openSubSheet(triggeredByAlert: false),
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Make Sub'),
+            ),
     );
   }
 }
@@ -210,27 +319,33 @@ class _ClockPanel extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            running
-                ? 'Next sub in ${mmss(state.secondsUntilNextSub)}'
-                : 'On break — clock paused',
+            state.gameEnded
+                ? 'Game over'
+                : (running
+                    ? 'Next sub in ${mmss(state.secondsUntilNextSub)}'
+                    : 'On break — clock paused'),
             style: TextStyle(
-              color: running ? scheme.primary : scheme.error,
+              color: state.gameEnded
+                  ? scheme.error
+                  : (running ? scheme.primary : scheme.error),
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              onPressed: state.togglePlayPause,
-              icon: Icon(running ? Icons.pause : Icons.play_arrow),
-              label: Text(running ? 'Take a break' : 'Resume game',
-                  style: const TextStyle(fontSize: 16)),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+          if (!state.gameEnded) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: state.togglePlayPause,
+                icon: Icon(running ? Icons.pause : Icons.play_arrow),
+                label: Text(running ? 'Take a break' : 'Resume game',
+                    style: const TextStyle(fontSize: 16)),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

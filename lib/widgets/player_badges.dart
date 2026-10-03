@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/player.dart';
 
-/// Small role markers shown next to a player's number:
+/// Small role markers shown next to a player's name:
 /// C captain, 🧤 goalie, ⭐ favorite. Renders nothing if the player has none.
 class PlayerBadges extends StatelessWidget {
   final Player player;
