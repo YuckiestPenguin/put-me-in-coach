@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/game_state.dart';
 import '../models/league.dart';
+import '../models/team.dart';
 
 /// Backs the coach's data up to Firestore under `users/{uid}`:
 ///   * `users/{uid}/team/roster` — one doc holding the roster
@@ -64,6 +65,48 @@ class CloudSync {
     });
   }
 
+  CollectionReference<Map<String, dynamic>> get _teams =>
+      FirebaseFirestore.instance.collection('users/$uid/teams');
+
+  /// All teams, by name.
+  Stream<List<Team>> teamsStream() => _teams.snapshots().map((s) {
+        final list = [for (final d in s.docs) Team.fromJson(d.id, d.data())];
+        list.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        return list;
+      });
+
+  /// Create (no id) or update a team. Rethrows so the editor can report
+  /// failures; Firestore queues the write itself when offline.
+  Future<void> saveTeam(Team team) async {
+    final data = {...team.toJson(), 'updatedAt': FieldValue.serverTimestamp()};
+    if (team.id == null) {
+      await _teams.add(data);
+    } else {
+      await _teams.doc(team.id).set(data);
+    }
+  }
+
+  Future<void> deleteTeam(String id) => _teams.doc(id).delete();
+
+  /// First run after teams were introduced: turn the single saved roster into
+  /// a first team called "My Team". Same safeguards as the league migration
+  /// (server check, fixed doc id).
+  Future<void> _migrateDefaultTeam() async {
+    final existing =
+        await _teams.limit(1).get(const GetOptions(source: Source.server));
+    if (existing.docs.isNotEmpty) return;
+    final roster = await _rosterDoc.get(const GetOptions(source: Source.server));
+    final players = roster.data()?['players'] as List?;
+    if (players == null || players.isEmpty) return;
+    await _teams.doc('default').set({
+      'name': 'My Team',
+      'leagueId': null,
+      'players': players,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Finished games, newest first. Includes games saved offline that haven't
   /// reached the server yet.
   Stream<List<({String id, Map<String, dynamic> data})>> gamesStream() =>
@@ -96,6 +139,9 @@ class CloudSync {
     }
     try {
       await _migrateDefaultLeague(state);
+    } catch (_) {}
+    try {
+      await _migrateDefaultTeam();
     } catch (_) {}
     state.onRosterChanged = () => pushRoster(state);
     state.onGameEnded = saveGame;

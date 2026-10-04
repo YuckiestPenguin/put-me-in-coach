@@ -5,6 +5,7 @@ import '../models/game_state.dart';
 import 'history_screen.dart';
 import 'leagues_screen.dart';
 import 'settings_screen.dart';
+import 'teams_screen.dart';
 
 /// Landing screen: past games and a button to start a new one.
 class HomeScreen extends StatelessWidget {
@@ -18,6 +19,13 @@ class HomeScreen extends StatelessWidget {
         title: const Text('Put Me In, Coach'),
         backgroundColor: scheme.primaryContainer,
         actions: [
+          IconButton(
+            tooltip: 'Teams',
+            icon: const Icon(Icons.groups_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TeamsScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Leagues',
             icon: const Icon(Icons.emoji_events_outlined),

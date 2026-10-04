@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:put_me_in_coach/models/game_state.dart';
 import 'package:put_me_in_coach/models/league.dart';
+import 'package:put_me_in_coach/models/team.dart';
 import 'package:put_me_in_coach/util/format.dart';
 import 'package:put_me_in_coach/models/player.dart';
 
@@ -340,6 +341,41 @@ void main() {
     expect(g2.periodMinutes, 20.0);
     expect(minutesText(7.5), '7.5');
     expect(minutesText(25), '25');
+  });
+
+  test('team needs only a name; roster and league are optional', () {
+    final t = Team(name: 'Tigers');
+    expect(t.leagueId, null);
+    expect(t.players, isEmpty);
+    final back = Team.fromJson('t1', t.toJson());
+    expect(back.name, 'Tigers');
+    expect(back.players, isEmpty);
+    expect(Team.fromJson('t2', {}).name, 'Team'); // defensive default
+  });
+
+  test('team roster round-trips with roles, ids and unique numbers', () {
+    final t = Team(name: 'Tigers', leagueId: 'L1');
+    t.players.add(Player(id: t.nextPlayerId(), name: 'Zed', number: 9));
+    t.players.add(Player(id: t.nextPlayerId(), name: 'Amy'));
+    t.sortPlayers();
+    expect(t.players.map((p) => p.name), ['Amy', 'Zed']);
+    expect(t.numberTaken(9), true);
+    expect(t.numberTaken(9, exceptId: 1), false); // editing Zed himself
+    expect(t.numberTaken(4), false);
+    final amy = t.players.first.id;
+    final zed = t.players.last.id;
+    t.toggleRole(amy, PlayerRole.goalie);
+    t.toggleRole(zed, PlayerRole.goalie); // moves the single goalie role
+    final back = Team.fromJson('t1', t.toJson());
+    expect(back.leagueId, 'L1');
+    expect(back.players.firstWhere((p) => p.id == zed).isGoalie, true);
+    expect(back.players.firstWhere((p) => p.id == amy).isGoalie, false);
+    // Per-game state is never saved with a team.
+    expect(t.players.first.toTeamJson().containsKey('secondsPlayed'), false);
+    // Editing a copy doesn't touch the original.
+    final c = t.copy()..players.first.name = 'Changed';
+    expect(t.players.first.name, 'Amy');
+    expect(c.players.first.name, 'Changed');
   });
 
   test('goals can be added and undone', () {

@@ -71,6 +71,16 @@ class Player {
     }
   }
 
+  /// Just the lasting team data (no per-game time, goals, or presence).
+  Map<String, dynamic> toTeamJson() => {
+        'id': id,
+        'name': name,
+        'number': number,
+        'isGoalie': isGoalie,
+        'isFavorite': isFavorite,
+        'isCaptain': isCaptain,
+      };
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'number': number,

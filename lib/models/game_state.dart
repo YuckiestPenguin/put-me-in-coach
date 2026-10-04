@@ -450,17 +450,8 @@ class GameState extends ChangeNotifier {
   void Function(Map<String, dynamic> summary)? onGameEnded;
 
   /// Roster as team data (no per-game state like time or goals).
-  List<Map<String, dynamic>> rosterToTeamJson() => [
-        for (final p in roster)
-          {
-            'id': p.id,
-            'name': p.name,
-            'number': p.number,
-            'isGoalie': p.isGoalie,
-            'isFavorite': p.isFavorite,
-            'isCaptain': p.isCaptain,
-          }
-      ];
+  List<Map<String, dynamic>> rosterToTeamJson() =>
+      [for (final p in roster) p.toTeamJson()];
 
   /// Replace the roster with team data from the cloud (fresh per-game state).
   void loadTeamFromJson(List<dynamic> players) {
