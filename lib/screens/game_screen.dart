@@ -123,7 +123,10 @@ class _GameScreenState extends State<GameScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               _state.endGame();
-              GameSummarySheet.show(context, _state);
+              // Closing the recap right after ending the game returns home.
+              GameSummarySheet.show(context, _state).then((_) {
+                if (mounted && _state.gameEnded) _state.goHome();
+              });
             },
             child: const Text('End game'),
           ),
