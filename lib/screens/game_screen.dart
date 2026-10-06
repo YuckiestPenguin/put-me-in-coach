@@ -334,6 +334,32 @@ class _ClockPanel extends StatelessWidget {
   final GameState state;
   const _ClockPanel({required this.state});
 
+  void _confirmEndPeriod(BuildContext context) {
+    final label = state.periodLabel.toLowerCase();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('End this $label?'),
+        content: Text('Starts ${state.periodLabel.toLowerCase()} '
+            '${state.currentPeriod + 1} with the clock paused, whether this '
+            'one ran short or long.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              state.endPeriod();
+            },
+            child: Text('End $label'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -362,7 +388,9 @@ class _ClockPanel extends StatelessWidget {
             ),
           ),
           Text(
-            '${mmss(state.secondsLeftInPeriod)} left in this ${state.periodLabel.toLowerCase()}',
+            state.secondsLeftInPeriod >= 0
+                ? '${mmss(state.secondsLeftInPeriod)} left in this ${state.periodLabel.toLowerCase()}'
+                : '${mmss(-state.secondsLeftInPeriod)} over — end the ${state.periodLabel.toLowerCase()} when ready',
             style: TextStyle(color: scheme.outline, fontSize: 13),
           ),
           const SizedBox(height: 4),
@@ -381,17 +409,34 @@ class _ClockPanel extends StatelessWidget {
           ),
           if (!state.gameEnded) ...[
             const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: state.togglePlayPause,
-                icon: Icon(running ? Icons.pause : Icons.play_arrow),
-                label: Text(running ? 'Take a break' : 'Resume game',
-                    style: const TextStyle(fontSize: 16)),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: state.togglePlayPause,
+                    icon: Icon(running ? Icons.pause : Icons.play_arrow),
+                    label: Text(running ? 'Take a break' : 'Resume game',
+                        style: const TextStyle(fontSize: 16)),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
                 ),
-              ),
+                if (state.canEndPeriod) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _confirmEndPeriod(context),
+                      icon: const Icon(Icons.skip_next),
+                      label: Text('End ${state.periodLabel.toLowerCase()}',
+                          style: const TextStyle(fontSize: 16)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ],

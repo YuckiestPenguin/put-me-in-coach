@@ -552,4 +552,44 @@ void main() {
     g.startGame();
     expect(g.roster.firstWhere((p) => p.number == 7).goals, 0);
   });
+
+  test('ending a period early or late starts the next one, paused', () {
+    final g = GameState()
+      ..periodCount = 3
+      ..setPeriodMinutes(1);
+    g.addPlayer('A');
+    g.startGame();
+    for (var i = 0; i < 90; i++) {
+      g.tick();
+    }
+    // Ran 30s past the scheduled minute, but stays in period 1.
+    expect(g.currentPeriod, 1);
+    expect(g.secondsLeftInPeriod, -30);
+    g.endPeriod();
+    expect(g.currentPeriod, 2);
+    expect(g.clockRunning, false);
+    expect(g.secondsLeftInPeriod, 60);
+    g.togglePlayPause();
+    for (var i = 0; i < 20; i++) {
+      g.tick();
+    }
+    g.endPeriod(); // early
+    expect(g.currentPeriod, 3);
+    expect(g.canEndPeriod, false); // last period: End game instead
+    g.endPeriod();
+    expect(g.currentPeriod, 3);
+    // Survives a save/load, and a new game starts over at period 1.
+    final back = GameState()..loadFromJson(g.toJson());
+    expect(back.currentPeriod, 3);
+    expect(back.secondsIntoPeriod, 0);
+    g.newGame();
+    expect(g.currentPeriod, 1);
+  });
+
+  test('saves from before period boundaries derive them from the length', () {
+    final g = GameState()
+      ..loadFromJson({'periodCount': 4, 'periodMinutes': 1, 'gameSeconds': 130});
+    expect(g.currentPeriod, 3);
+    expect(g.secondsIntoPeriod, 10);
+  });
 }

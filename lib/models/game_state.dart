@@ -136,6 +136,7 @@ class GameState extends ChangeNotifier {
     startedAt = null;
     endedAt = null;
     gameSeconds = 0;
+    periodStarts = [0];
     subIntervalSeconds = 300;
     lastAlertSecond = 0;
     periodCount = 2;
@@ -339,6 +340,7 @@ class GameState extends ChangeNotifier {
     endedAt = null;
     clockRunning = true;
     gameSeconds = 0;
+    periodStarts = [0];
     lastAlertSecond = 0;
     unattributedGoals = 0;
     theirScore = 0;
@@ -390,20 +392,32 @@ class GameState extends ChangeNotifier {
 
   int get totalGameLengthSeconds => periodCount * periodLengthSeconds;
 
-  /// 1-based index of the period the game clock is currently in. Clamped to
-  /// [periodCount] so running past the scheduled length still shows the last
-  /// period rather than rolling into a nonexistent one.
-  int get currentPeriod =>
-      (gameSeconds ~/ periodLengthSeconds).clamp(0, periodCount - 1) + 1;
+  /// Game-clock second at which each period began (the first is always 0).
+  /// Periods advance only when the coach ends one ([endPeriod]), so one can
+  /// run long or be cut short.
+  List<int> periodStarts = [0];
+
+  /// 1-based index of the period in progress. Clamped to [periodCount] in
+  /// case the period count was lowered mid-game.
+  int get currentPeriod => periodStarts.length.clamp(1, periodCount);
 
   /// Seconds elapsed within the current period.
-  int get secondsIntoPeriod =>
-      gameSeconds - (currentPeriod - 1) * periodLengthSeconds;
+  int get secondsIntoPeriod => gameSeconds - periodStarts[currentPeriod - 1];
 
-  /// Seconds remaining in the current period (0 once the game has run past
-  /// its scheduled length).
-  int get secondsLeftInPeriod =>
-      (periodLengthSeconds - secondsIntoPeriod).clamp(0, periodLengthSeconds);
+  /// Seconds remaining in the current period (negative once it runs over).
+  int get secondsLeftInPeriod => periodLengthSeconds - secondsIntoPeriod;
+
+  bool get canEndPeriod => !gameEnded && currentPeriod < periodCount;
+
+  /// End the current period early or late and start the next one. The clock
+  /// pauses, since the next period starts with a break.
+  void endPeriod() {
+    if (!canEndPeriod) return;
+    periodStarts = [...periodStarts.sublist(0, currentPeriod), gameSeconds];
+    clockRunning = false;
+    _save();
+    notifyListeners();
+  }
 
   void setPeriodCount(int count) {
     if (count < 1) return;
@@ -525,6 +539,7 @@ class GameState extends ChangeNotifier {
     startedAt = null;
     endedAt = null;
     gameSeconds = 0;
+    periodStarts = [0];
     lastAlertSecond = 0;
     unattributedGoals = 0;
     theirScore = 0;
@@ -609,6 +624,7 @@ class GameState extends ChangeNotifier {
         'lastAlertSecond': lastAlertSecond,
         'periodCount': periodCount,
         'periodMinutes': periodMinutes,
+        'periodStarts': periodStarts,
         'roster': roster.map((p) => p.toJson()).toList(),
       };
 
@@ -632,6 +648,16 @@ class GameState extends ChangeNotifier {
     lastAlertSecond = json['lastAlertSecond'] as int? ?? 0;
     periodCount = json['periodCount'] as int? ?? 2;
     periodMinutes = (json['periodMinutes'] as num?)?.toDouble() ?? 25;
+    final starts = (json['periodStarts'] as List?)?.cast<int>();
+    // Older saves had no boundaries; periods then followed the scheduled length.
+    periodStarts = starts != null && starts.isNotEmpty
+        ? starts
+        : [
+            for (var i = 0;
+                i < periodCount && i * periodLengthSeconds <= gameSeconds;
+                i++)
+              i * periodLengthSeconds,
+          ];
     roster
       ..clear()
       ..addAll(
