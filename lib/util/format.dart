@@ -15,3 +15,13 @@ String clockTime(DateTime t) {
 /// Minutes without a trailing ".0": 25 -> "25", 7.5 -> "7.5".
 String minutesText(double m) =>
     m == m.roundToDouble() ? m.toInt().toString() : m.toStringAsFixed(1);
+
+/// "3–2 (Win)" from a saved game summary, or null for games saved before
+/// scores were tracked.
+String? resultText(Map<String, dynamic> summary) {
+  final ours = summary['ourScore'] as int?;
+  final theirs = summary['theirScore'] as int?;
+  if (ours == null || theirs == null) return null;
+  final result = ours > theirs ? 'Win' : (ours < theirs ? 'Loss' : 'Draw');
+  return '$ours–$theirs ($result)';
+}

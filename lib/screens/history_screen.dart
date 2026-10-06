@@ -101,6 +101,7 @@ class _GameTile extends StatelessWidget {
       title: Text(title),
       subtitle: Text([
         if (data['teamName'] != null) data['teamName'],
+        ?resultText(data),
         mmss(data['gameSeconds'] as int? ?? 0),
         '$present players',
         '$goals goals',

@@ -258,6 +258,8 @@ class _GameScreenState extends State<GameScreen> {
             ),
           _ClockPanel(state: state),
           const Divider(height: 1),
+          _ScoreBar(state: state),
+          const Divider(height: 1),
           _FieldCountBar(state: state),
           const Divider(height: 1),
           Expanded(
@@ -427,6 +429,128 @@ class _FieldCountBar extends StatelessWidget {
             onPressed: state.incrementTarget,
             icon: const Icon(Icons.add),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Live score. Our side counts player goals automatically (tap ⚽ on a player);
+/// the + here adds a goal with no scorer, such as an own goal by the other
+/// team. Also flags when the league allows an extra player.
+class _ScoreBar extends StatelessWidget {
+  final GameState state;
+  const _ScoreBar({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final editable = !state.gameEnded;
+    final big = Theme.of(context)
+        .textTheme
+        .headlineMedium
+        ?.copyWith(fontWeight: FontWeight.bold);
+
+    Widget side({
+      required String label,
+      required int score,
+      required VoidCallback? onMinus,
+      required VoidCallback? onPlus,
+      required String plusTip,
+    }) {
+      return Expanded(
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(color: scheme.outline)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 40,
+                  child: onMinus == null
+                      ? null
+                      : IconButton(
+                          tooltip: 'Take one away',
+                          onPressed: onMinus,
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: Text('$score', textAlign: TextAlign.center, style: big),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: onPlus == null
+                      ? null
+                      : IconButton(
+                          tooltip: plusTip,
+                          onPressed: onPlus,
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              side(
+                label: state.teamName ?? 'Us',
+                score: state.ourScore,
+                onMinus: editable && state.unattributedGoals > 0
+                    ? state.undoUnattributedGoal
+                    : null,
+                onPlus: editable
+                    ? () {
+                        Alerts.tap();
+                        state.addUnattributedGoal();
+                      }
+                    : null,
+                plusTip: 'Goal with no scorer (e.g. an own goal by them)',
+              ),
+              Text('–', style: big),
+              side(
+                label: 'Them',
+                score: state.theirScore,
+                onMinus: editable && state.theirScore > 0
+                    ? state.undoTheirGoal
+                    : null,
+                onPlus: editable
+                    ? () {
+                        Alerts.tap();
+                        state.addTheirGoal();
+                      }
+                    : null,
+                plusTip: 'Their goal',
+              ),
+            ],
+          ),
+          if (state.extraPlayerAllowed)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Down by ${state.trailingBy} — you may add an extra player',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
       ),
     );

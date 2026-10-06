@@ -459,6 +459,77 @@ void main() {
     expect(c.players.first.name, 'Changed');
   });
 
+  test('score = player goals + unattributed; they have their own counter', () {
+    final g = freshGame();
+    g.addGoal(idOf(g, 7));
+    g.addGoal(idOf(g, 10));
+    g.addUnattributedGoal();
+    g.addTheirGoal();
+    g.addTheirGoal();
+    expect(g.ourScore, 3);
+    expect(g.theirScore, 2);
+    g.undoGoal(idOf(g, 7)); // undoing a player's goal lowers our score
+    expect(g.ourScore, 2);
+    g.undoUnattributedGoal();
+    g.undoUnattributedGoal(); // can't go below zero
+    expect(g.unattributedGoals, 0);
+    g.undoTheirGoal();
+    g.undoTheirGoal();
+    g.undoTheirGoal();
+    expect(g.theirScore, 0);
+  });
+
+  test('removing a player keeps their goals in the score', () {
+    final g = freshGame();
+    g.addGoal(idOf(g, 7));
+    g.addGoal(idOf(g, 7));
+    expect(g.ourScore, 2);
+    g.removePlayer(idOf(g, 7)); // e.g. injured
+    expect(g.ourScore, 2);
+  });
+
+  test('extra player allowed only when trailing by more than the threshold', () {
+    final g = freshGame();
+    g.applyLeague(League(name: 'L', extraPlayerTrailingBy: 4));
+    for (var i = 0; i < 4; i++) {
+      g.addTheirGoal();
+    }
+    expect(g.trailingBy, 4);
+    expect(g.extraPlayerAllowed, false); // 4 is not "more than 4"
+    g.addTheirGoal();
+    expect(g.extraPlayerAllowed, true);
+    g.addGoal(idOf(g, 7)); // back to 4 down
+    expect(g.extraPlayerAllowed, false);
+    g.endGame();
+    g.addTheirGoal();
+    g.addTheirGoal();
+    expect(g.extraPlayerAllowed, false); // never after the game ends
+    // A league with no such rule never allows it.
+    final h = freshGame();
+    for (var i = 0; i < 9; i++) {
+      h.addTheirGoal();
+    }
+    expect(h.extraPlayerAllowed, false);
+  });
+
+  test('score is saved, reset for a new game, and shown in the summary', () {
+    final g = freshGame();
+    g.addGoal(idOf(g, 7));
+    g.addTheirGoal();
+    final s = g.summaryJson();
+    expect(s['ourScore'], 1);
+    expect(s['theirScore'], 1);
+    expect(resultText(s), '1–1 (Draw)');
+    expect(resultText({'ourScore': 3, 'theirScore': 1}), '3–1 (Win)');
+    expect(resultText({'ourScore': 0, 'theirScore': 2}), '0–2 (Loss)');
+    expect(resultText({}), null); // games saved before scores existed
+    final g2 = GameState()..loadFromJson(g.toJson());
+    expect(g2.theirScore, 1);
+    g.newGame();
+    expect(g.theirScore, 0);
+    expect(g.ourScore, 0);
+  });
+
   test('goals can be added and undone', () {
     final g = freshGame();
     g.addGoal(idOf(g, 7));

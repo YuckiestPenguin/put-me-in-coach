@@ -124,6 +124,8 @@ class GameState extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     roster.clear();
+    unattributedGoals = 0;
+    theirScore = 0;
     teamId = teamName = leagueId = leagueName = null;
     extraPlayerTrailingBy = null;
     onFieldTarget = 7;
@@ -207,7 +209,57 @@ class GameState extends ChangeNotifier {
   void _sortRoster() => roster
       .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+  // ---- Score --------------------------------------------------------------
+
+  /// Our goals that no player gets credit for (an own goal by the other team,
+  /// or goals a removed player had scored), so the score never drops.
+  int unattributedGoals = 0;
+
+  /// The other team's goals.
+  int theirScore = 0;
+
+  /// Our score: every player's goals plus any unattributed ones.
+  int get ourScore =>
+      roster.fold<int>(0, (n, p) => n + p.goals) + unattributedGoals;
+
+  /// How far we're behind (negative when ahead).
+  int get trailingBy => theirScore - ourScore;
+
+  /// True while the league lets us put an extra player on the field because
+  /// we're trailing by more than its threshold.
+  bool get extraPlayerAllowed =>
+      gameStarted &&
+      !gameEnded &&
+      extraPlayerTrailingBy != null &&
+      trailingBy > extraPlayerTrailingBy!;
+
+  void addTheirGoal() {
+    theirScore++;
+    _save();
+    notifyListeners();
+  }
+
+  void undoTheirGoal() {
+    if (theirScore > 0) theirScore--;
+    _save();
+    notifyListeners();
+  }
+
+  void addUnattributedGoal() {
+    unattributedGoals++;
+    _save();
+    notifyListeners();
+  }
+
+  void undoUnattributedGoal() {
+    if (unattributedGoals > 0) unattributedGoals--;
+    _save();
+    notifyListeners();
+  }
+
   void removePlayer(int id) {
+    // Keep their goals in our score.
+    unattributedGoals += roster.firstWhere((p) => p.id == id).goals;
     roster.removeWhere((p) => p.id == id);
     _save();
     notifyListeners();
@@ -288,6 +340,8 @@ class GameState extends ChangeNotifier {
     clockRunning = true;
     gameSeconds = 0;
     lastAlertSecond = 0;
+    unattributedGoals = 0;
+    theirScore = 0;
     for (final p in roster) {
       p.secondsPlayed = 0;
       p.goals = 0;
@@ -472,6 +526,8 @@ class GameState extends ChangeNotifier {
     endedAt = null;
     gameSeconds = 0;
     lastAlertSecond = 0;
+    unattributedGoals = 0;
+    theirScore = 0;
     for (final p in roster) {
       p.secondsPlayed = 0;
       p.onField = false;
@@ -512,6 +568,8 @@ class GameState extends ChangeNotifier {
         'teamName': teamName,
         'leagueId': leagueId,
         'leagueName': leagueName,
+        'ourScore': ourScore,
+        'theirScore': theirScore,
         'startedAt': startedAt?.toIso8601String(),
         'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
@@ -542,6 +600,8 @@ class GameState extends ChangeNotifier {
         'leagueId': leagueId,
         'leagueName': leagueName,
         'extraPlayerTrailingBy': extraPlayerTrailingBy,
+        'unattributedGoals': unattributedGoals,
+        'theirScore': theirScore,
         'startedAt': startedAt?.toIso8601String(),
         'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
@@ -563,6 +623,8 @@ class GameState extends ChangeNotifier {
     leagueId = json['leagueId'] as String?;
     leagueName = json['leagueName'] as String?;
     extraPlayerTrailingBy = json['extraPlayerTrailingBy'] as int?;
+    unattributedGoals = json['unattributedGoals'] as int? ?? 0;
+    theirScore = json['theirScore'] as int? ?? 0;
     startedAt = DateTime.tryParse(json['startedAt'] as String? ?? '');
     endedAt = DateTime.tryParse(json['endedAt'] as String? ?? '');
     gameSeconds = json['gameSeconds'] as int? ?? 0;

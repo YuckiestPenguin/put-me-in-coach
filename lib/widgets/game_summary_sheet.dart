@@ -48,6 +48,17 @@ class GameSummarySheet extends StatelessWidget {
             Text('Game summary',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
+            if (resultText(summary) != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  'Final score: ${resultText(summary)}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
             if (summary['teamName'] != null || summary['leagueName'] != null)
               Text(
                 [
