@@ -1,6 +1,6 @@
 # Handoff — Put Me In, Coach
 
-Snapshot as of 2026-10-06 (last commit `05a7466`). Written so a fresh session can
+Snapshot as of 2026-10-06 (see `git log` for the latest commit). Written so a fresh session can
 pick up without the prior conversation.
 
 ## What this is
@@ -25,10 +25,15 @@ Working and pushed:
   Firestore. Half-minute steps for period length and sub interval.
 - New game: pick a team (loads roster) and a league (applies rules); both optional.
   A lone team is auto-selected. Roster edits in setup affect that game only.
-- Home screen lists saved games (tap = summary, swipe = delete), "New game", Teams
+- Home screen lists saved games (tap = summary, swipe = delete; a cloud-off icon
+  marks games not yet synced; league filter chips appear once games span more
+  than one league or a league plus no-league), "New game", Teams
   and Leagues icons. Game menu has Home / Add player / Game settings / End game /
   New game.
 - Hosting: dev site is live at https://put-me-in-coach-dev.web.app.
+- Failed game saves/deletes show a snackbar (`CloudSync.onError`, wired in
+  `main.dart`). Offline writes are queued by Firestore, not errors.
+- Debug sub-timer menu item is hidden outside debug builds.
 - 36 unit tests (game logic + models), `flutter analyze` clean.
 
 **Not done / needs verification**
@@ -127,21 +132,19 @@ or simulator. Verify on web.
 ## Open issues (GitHub)
 
 Ready to pick up:
-- **#4** Home: filter past games by league (small; games now record `leagueId`).
 - **#5** Share a game summary as image/PDF.
 - **#6** Seasons (team + league over time). Depends on #1–#3 (done).
 - **#10** Native iOS/Android with separate dev/prod Firebase configs (needs Xcode).
-- **#13** Show sync status / surface cloud errors. `CloudSync` still swallows
-  errors on saves (`catch (_) {}`); the games list already shows errors + a retry.
-- **#14** Hide the debug sub-timer menu item outside debug builds (trivial).
 - **#15** Widget/integration tests + GitHub Actions CI (largest of the cleanups).
-- **#16** README polish (most of it was written with hosting; needs a short
-  "what it does / architecture" section).
 
 On hold (label `on-hold`): **#8** location + weather, **#11** security hardening
 (restrict API keys, App Check, rules tests).
 
-Suggested order: #14 → #13 → #16 → #4 → #15 → #5 → #6.
+Done since the last snapshot: #4, #13, #14, #16. The league filter (#4) and the
+sync-error snackbar/pending icon (#13) were only checked with `flutter analyze` and
+unit tests, not in a browser.
+
+Suggested order: #15 → #5 → #6.
 
 ## Which model to use
 

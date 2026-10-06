@@ -7,8 +7,18 @@ import '../widgets/game_summary_sheet.dart';
 import '../widgets/slow_load_notice.dart';
 
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// Past games, newest first. Tap one for its summary; swipe to delete.
@@ -20,6 +30,10 @@ class GameHistoryList extends StatefulWidget {
 }
 
 class _GameHistoryListState extends State<GameHistoryList> {
+  /// League filter: null = all games, [_noLeague] = games without a league,
+  /// otherwise a league id.
+  static const _noLeague = '';
+  String? _leagueFilter;
   CloudSync? _sync;
   Stream<List<({String id, Map<String, dynamic> data, bool pending})>>? _games;
 
@@ -44,11 +58,13 @@ class _GameHistoryListState extends State<GameHistoryList> {
         content: const Text('This removes it from your history for good.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -74,12 +90,13 @@ class _GameHistoryListState extends State<GameHistoryList> {
                 children: [
                   const Text("Couldn't load games."),
                   const SizedBox(height: 8),
-                  Text('${snap.error}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: scheme.outline, fontSize: 12)),
+                  Text(
+                    '${snap.error}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.outline, fontSize: 12),
+                  ),
                   const SizedBox(height: 12),
-                  OutlinedButton(
-                      onPressed: _retry, child: const Text('Retry')),
+                  OutlinedButton(onPressed: _retry, child: const Text('Retry')),
                 ],
               ),
             ),
@@ -88,14 +105,47 @@ class _GameHistoryListState extends State<GameHistoryList> {
         if (!snap.hasData) {
           return SlowLoadNotice(onRetry: _retry, diagnose: sync.probe);
         }
-        final games = snap.data!;
-        if (games.isEmpty) {
+        final allGames = snap.data!;
+        if (allGames.isEmpty) {
           return Center(
-            child: Text('No games yet. Finished games show up here.',
-                style: TextStyle(color: scheme.outline)),
+            child: Text(
+              'No games yet. Finished games show up here.',
+              style: TextStyle(color: scheme.outline),
+            ),
           );
         }
-        return ListView.separated(
+        // Leagues that appear in saved games, by name. Older games and games
+        // started without a league have no leagueId.
+        final leagues = <String, String>{};
+        var hasUnleagued = false;
+        for (final g in allGames) {
+          final id = g.data['leagueId'] as String?;
+          if (id == null) {
+            hasUnleagued = true;
+          } else {
+            leagues[id] = g.data['leagueName'] as String? ?? 'League';
+          }
+        }
+        final leagueIds = leagues.keys.toList()
+          ..sort(
+            (a, b) =>
+                leagues[a]!.toLowerCase().compareTo(leagues[b]!.toLowerCase()),
+          );
+        final showFilter =
+            leagues.isNotEmpty && (leagues.length > 1 || hasUnleagued);
+        // A filter whose games were all deleted would show an empty list.
+        final filter = switch (_leagueFilter) {
+          null => null,
+          _noLeague => hasUnleagued ? _noLeague : null,
+          final id => leagues.containsKey(id) ? id : null,
+        };
+        final games = filter == null
+            ? allGames
+            : [
+                for (final g in allGames)
+                  if ((g.data['leagueId'] as String? ?? _noLeague) == filter) g,
+              ];
+        final list = ListView.separated(
           itemCount: games.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (_, i) {
@@ -115,6 +165,34 @@ class _GameHistoryListState extends State<GameHistoryList> {
             );
           },
         );
+        if (!showFilter) return list;
+        return Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  for (final (value, label) in [
+                    (null, 'All'),
+                    for (final id in leagueIds) (id, leagues[id]!),
+                    if (hasUnleagued) (_noLeague, 'No league'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(label),
+                        selected: filter == value,
+                        onSelected: (_) =>
+                            setState(() => _leagueFilter = value),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(child: list),
+          ],
+        );
       },
     );
   }
@@ -130,25 +208,32 @@ class _GameTile extends StatelessWidget {
     final start = DateTime.tryParse(data['startedAt'] as String? ?? '');
     final players = (data['players'] as List? ?? []).cast<Map>();
     final present = players.where((p) => p['present'] != false).length;
-    final goals =
-        players.fold<int>(0, (n, p) => n + ((p['goals'] as int?) ?? 0));
+    final goals = players.fold<int>(
+      0,
+      (n, p) => n + ((p['goals'] as int?) ?? 0),
+    );
     final title = start == null
         ? 'Game'
         : '${_months[start.month - 1]} ${start.day} · ${clockTime(start)}';
     return ListTile(
       title: Text(title),
-      subtitle: Text([
-        if (data['teamName'] != null) data['teamName'],
-        ?resultText(data),
-        mmss(data['gameSeconds'] as int? ?? 0),
-        '$present players',
-        '$goals goals',
-      ].join(' · ')),
+      subtitle: Text(
+        [
+          if (data['teamName'] != null) data['teamName'],
+          ?resultText(data),
+          mmss(data['gameSeconds'] as int? ?? 0),
+          '$present players',
+          '$goals goals',
+        ].join(' · '),
+      ),
       trailing: pending
           ? Tooltip(
               message: 'Not synced yet',
-              child: Icon(Icons.cloud_off,
-                  size: 20, color: Theme.of(context).colorScheme.outline),
+              child: Icon(
+                Icons.cloud_off,
+                size: 20,
+                color: Theme.of(context).colorScheme.outline,
+              ),
             )
           : const Icon(Icons.chevron_right),
       onTap: () => GameSummarySheet.showSummary(context, data),
