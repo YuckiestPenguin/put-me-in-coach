@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -226,12 +227,13 @@ class _GameScreenState extends State<GameScreen> {
                 const PopupMenuItem(
                     value: 'summary', child: Text('Game summary')),
               const PopupMenuItem(value: 'new', child: Text('New game')),
-              PopupMenuItem(
-                value: 'fast',
-                child: Text(state.subIntervalSeconds == 300
-                    ? 'Debug: fast sub timer (20s)'
-                    : 'Debug: normal sub timer (5m)'),
-              ),
+              if (kDebugMode)
+                PopupMenuItem(
+                  value: 'fast',
+                  child: Text(state.subIntervalSeconds == 300
+                      ? 'Debug: fast sub timer (20s)'
+                      : 'Debug: normal sub timer (5m)'),
+                ),
             ],
           ),
         ],
