@@ -99,9 +99,12 @@ class _GameTile extends StatelessWidget {
         : '${_months[start.month - 1]} ${start.day} · ${clockTime(start)}';
     return ListTile(
       title: Text(title),
-      subtitle: Text(
-          '${mmss(data['gameSeconds'] as int? ?? 0)} · $present players · '
-          '$goals goals'),
+      subtitle: Text([
+        if (data['teamName'] != null) data['teamName'],
+        mmss(data['gameSeconds'] as int? ?? 0),
+        '$present players',
+        '$goals goals',
+      ].join(' · ')),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => GameSummarySheet.showSummary(context, data),
     );

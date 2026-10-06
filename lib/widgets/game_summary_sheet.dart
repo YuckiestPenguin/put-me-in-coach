@@ -48,6 +48,14 @@ class GameSummarySheet extends StatelessWidget {
             Text('Game summary',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
+            if (summary['teamName'] != null || summary['leagueName'] != null)
+              Text(
+                [
+                  if (summary['teamName'] != null) summary['teamName'],
+                  if (summary['leagueName'] != null) summary['leagueName'],
+                ].join(' · '),
+                style: const TextStyle(fontSize: 16),
+              ),
             Text(
               [
                 if (start != null) 'Started ${clockTime(start)}',

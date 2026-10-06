@@ -4,13 +4,15 @@ import '../models/game_state.dart';
 import '../models/league.dart';
 import '../models/team.dart';
 
-/// Backs the coach's data up to Firestore under `users/{uid}`:
-///   * `users/{uid}/team/roster` — one doc holding the roster
-///   * `users/{uid}/games/{id}`  — one doc per finished game
+/// The coach's data in Firestore, under `users/{uid}`:
+///   * `leagues/{id}` — game format and rules
+///   * `teams/{id}`   — name, league, roster
+///   * `games/{id}`   — one doc per finished game
+///   * `team/roster`  — legacy single roster, only read once to migrate it
 ///
-/// Local storage stays the source of truth during a game (it works offline);
-/// the cloud copy is written only on roster edits and at end of game, never on
-/// clock ticks. Firestore queues writes made offline and sends them later.
+/// The game in progress lives in local storage (it must work offline mid-game);
+/// a finished game is written to the cloud, never on clock ticks. Firestore
+/// queues writes made offline and sends them later.
 class CloudSync {
   final String uid;
   CloudSync(this.uid);
@@ -120,45 +122,22 @@ class CloudSync {
     } catch (_) {}
   }
 
-  /// Connects [state] to the cloud. If this device has no roster yet but the
-  /// cloud does (new device / reinstall), the cloud roster is loaded;
-  /// otherwise this device's roster is what gets saved.
+  /// Connects [state] to the cloud: one-time migrations of pre-existing local
+  /// data into leagues and teams, then saving each finished game.
   Future<void> attach(GameState state) async {
     try {
-      if (state.roster.isEmpty) {
-        final snap = await _rosterDoc.get();
-        final players = snap.data()?['players'] as List?;
-        if (players != null && players.isNotEmpty) {
-          state.loadTeamFromJson(players);
-        }
-      } else {
-        await pushRoster(state);
-      }
+      await _migrateDefaultLeague(state);
     } catch (_) {
       // Offline or rules not deployed: carry on locally.
     }
     try {
-      await _migrateDefaultLeague(state);
-    } catch (_) {}
-    try {
       await _migrateDefaultTeam();
     } catch (_) {}
-    state.onRosterChanged = () => pushRoster(state);
     state.onGameEnded = saveGame;
   }
 
   void detach(GameState state) {
-    state.onRosterChanged = null;
     state.onGameEnded = null;
-  }
-
-  Future<void> pushRoster(GameState state) async {
-    try {
-      await _rosterDoc.set({
-        'players': state.rosterToTeamJson(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {}
   }
 
   Future<void> saveGame(Map<String, dynamic> summary) async {

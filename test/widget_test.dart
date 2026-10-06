@@ -71,27 +71,30 @@ void main() {
     expect(g.fieldCount, 2); // still two on the field
   });
 
-  test('a role is single-assignment — moving it clears the previous holder', () {
-    final g = freshGame();
-    g.toggleRole(idOf(g, 7), PlayerRole.goalie);
-    expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, true);
+  test(
+    'a role is single-assignment — moving it clears the previous holder',
+    () {
+      final g = freshGame();
+      g.toggleRole(idOf(g, 7), PlayerRole.goalie);
+      expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, true);
 
-    // Assigning goalie to 10 must take it away from 7.
-    g.toggleRole(idOf(g, 10), PlayerRole.goalie);
-    expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, false);
-    expect(g.roster.firstWhere((p) => p.number == 10).isGoalie, true);
-    expect(g.roster.where((p) => p.isGoalie).length, 1);
+      // Assigning goalie to 10 must take it away from 7.
+      g.toggleRole(idOf(g, 10), PlayerRole.goalie);
+      expect(g.roster.firstWhere((p) => p.number == 7).isGoalie, false);
+      expect(g.roster.firstWhere((p) => p.number == 10).isGoalie, true);
+      expect(g.roster.where((p) => p.isGoalie).length, 1);
 
-    // Tapping the same player again clears the role entirely.
-    g.toggleRole(idOf(g, 10), PlayerRole.goalie);
-    expect(g.roster.where((p) => p.isGoalie).length, 0);
+      // Tapping the same player again clears the role entirely.
+      g.toggleRole(idOf(g, 10), PlayerRole.goalie);
+      expect(g.roster.where((p) => p.isGoalie).length, 0);
 
-    // Roles are independent: captain and favorite can coexist on a player.
-    g.toggleRole(idOf(g, 3), PlayerRole.captain);
-    g.toggleRole(idOf(g, 3), PlayerRole.favorite);
-    final p3 = g.roster.firstWhere((p) => p.number == 3);
-    expect(p3.isCaptain && p3.isFavorite, true);
-  });
+      // Roles are independent: captain and favorite can coexist on a player.
+      g.toggleRole(idOf(g, 3), PlayerRole.captain);
+      g.toggleRole(idOf(g, 3), PlayerRole.favorite);
+      final p3 = g.roster.firstWhere((p) => p.number == 3);
+      expect(p3.isCaptain && p3.isFavorite, true);
+    },
+  );
 
   test('fairness sorting surfaces least-played on the bench', () {
     final g = freshGame();
@@ -186,7 +189,7 @@ void main() {
       'roster': [
         {'number': 5},
         {'number': 8, 'name': 'Sam'},
-      ]
+      ],
     });
     expect(g.roster.map((p) => p.name), ['#5', 'Sam']);
     expect(g.roster.map((p) => p.id), [5, 8]);
@@ -233,31 +236,92 @@ void main() {
     expect(g.startedAt, null);
   });
 
-  test('cloud hooks fire for roster edits and end of game, not for ticks', () {
+  test('the end-of-game hook fires once with a full summary', () {
     final g = freshGame();
-    var rosterCalls = 0;
     Map<String, dynamic>? summary;
-    g.onRosterChanged = () => rosterCalls++;
-    g.onGameEnded = (s) => summary = s;
+    var calls = 0;
+    g.onGameEnded = (s) {
+      summary = s;
+      calls++;
+    };
     g.tick();
-    expect(rosterCalls, 0);
-    g.addPlayer('New');
-    g.toggleRole(idOf(g, 7), PlayerRole.captain);
-    expect(rosterCalls, 2);
+    expect(calls, 0); // ticks never reach the cloud
     g.endGame();
-    expect(summary!['players'], hasLength(4));
+    expect(calls, 1);
+    expect(summary!['players'], hasLength(3));
     expect(summary!['gameSeconds'], 1);
   });
 
-  test('cloud roster loads as a fresh team', () {
-    final g = GameState();
-    g.loadTeamFromJson([
-      {'id': 2, 'name': 'Zed', 'number': 9, 'isGoalie': true},
-      {'id': 1, 'name': 'Amy'},
-    ]);
-    expect(g.roster.map((p) => p.name), ['Amy', 'Zed']);
+  test('picking a team loads a fresh roster; clearing it empties it', () {
+    final g = freshGame();
+    final team = Team(id: 't1', name: 'Tigers', leagueId: 'L1');
+    team.players.add(Player(id: 1, name: 'Zed', number: 9, isGoalie: true));
+    team.players.add(Player(id: 2, name: 'Amy'));
+    g.applyTeam(team);
+    expect(g.roster.map((p) => p.name), ['Amy', 'Zed']); // replaced, sorted
+    expect(g.teamId, 't1');
+    expect(g.teamName, 'Tigers');
     expect(g.roster.last.isGoalie, true);
     expect(g.roster.every((p) => p.secondsPlayed == 0 && p.isPresent), true);
+    // Game-only edits don't touch the team.
+    g.addPlayer('Guest');
+    g.roster.firstWhere((p) => p.name == 'Zed').goals = 3;
+    expect(team.players.length, 2);
+    expect(team.players.first.toTeamJson().containsKey('goals'), false);
+    g.clearTeam();
+    expect(g.roster, isEmpty);
+    expect(g.teamId, null);
+  });
+
+  test('picking a league applies its rules; clearing keeps the numbers', () {
+    final g = GameState();
+    g.applyLeague(
+      League(
+        id: 'L1',
+        name: 'Rec U10',
+        periodCount: 4,
+        periodMinutes: 12.5,
+        playersOnField: 9,
+        subIntervalMinutes: 6.5,
+        extraPlayerTrailingBy: 4,
+      ),
+    );
+    expect(g.periodCount, 4);
+    expect(g.periodMinutes, 12.5);
+    expect(g.onFieldTarget, 9);
+    expect(g.subIntervalSeconds, 390);
+    expect(g.extraPlayerTrailingBy, 4);
+    expect(g.leagueName, 'Rec U10');
+    g.clearLeague();
+    expect(g.leagueId, null);
+    expect(g.extraPlayerTrailingBy, null);
+    expect(
+      g.periodCount,
+      4,
+    ); // custom rules start from where the league left off
+  });
+
+  test('team and league are recorded on the summary and survive a reload', () {
+    final g = freshGame();
+    g.applyTeam(
+      Team(id: 't1', name: 'Tigers')..players.add(Player(id: 1, name: 'Amy')),
+    );
+    g.applyLeague(League(id: 'L1', name: 'Rec U10'));
+    g.toggleStarter(1);
+    g.startGame();
+    final s = g.summaryJson();
+    expect(s['teamId'], 't1');
+    expect(s['teamName'], 'Tigers');
+    expect(s['leagueName'], 'Rec U10');
+    final g2 = GameState()..loadFromJson(g.toJson());
+    expect(g2.teamName, 'Tigers');
+    expect(g2.leagueId, 'L1');
+  });
+
+  test('a one-off game has no team or league on its summary', () {
+    final s = freshGame().summaryJson();
+    expect(s['teamId'], null);
+    expect(s['leagueName'], null);
   });
 
   test('setup flow: home -> setup -> game; new game returns to setup', () {
@@ -273,6 +337,25 @@ void main() {
     expect(g2.settingUp, true);
   });
 
+  test(
+    'starting setup from home clears any previous team, league and roster',
+    () {
+      final g = freshGame();
+      g.applyTeam(
+        Team(id: 't1', name: 'Tigers')..players.add(Player(id: 1, name: 'Amy')),
+      );
+      g.applyLeague(
+        League(id: 'L1', name: 'Rec U10', extraPlayerTrailingBy: 4),
+      );
+      g.goHome();
+      g.beginSetup();
+      expect(g.roster, isEmpty);
+      expect(g.teamId, null);
+      expect(g.leagueId, null);
+      expect(g.extraPlayerTrailingBy, null);
+    },
+  );
+
   test('goHome leaves the game and lands on home, not setup', () {
     final g = freshGame();
     g.goHome();
@@ -283,19 +366,15 @@ void main() {
 
   test('a different user signing in does not inherit the previous roster', () {
     final g = freshGame();
-    var pushed = 0;
-    g.onRosterChanged = () => pushed++;
     g.adoptUser('coachA'); // legacy local data is adopted, not wiped
     expect(g.roster.length, 3);
     expect(g.ownerUid, 'coachA');
     g.adoptUser('coachA'); // same user again: untouched
     expect(g.roster.length, 3);
-    g.onRosterChanged = null; // detached before the switch, as in main.dart
     g.adoptUser('coachB');
     expect(g.roster, isEmpty);
     expect(g.gameStarted, false);
     expect(g.ownerUid, 'coachB');
-    expect(pushed, 0);
     // The owner survives a reload so the check works across app restarts.
     final g2 = GameState()..loadFromJson(g.toJson());
     expect(g2.ownerUid, 'coachB');
@@ -317,8 +396,10 @@ void main() {
     expect(back.extraPlayerTrailingBy, 4);
     expect(back.totalMinutes, 50);
     expect(back.periodMinutes, 12.5);
-    expect(back.summary,
-        '4 quarters × 12.5 min · 7 on field · sub every 6.5 min · extra player if down by more than 4');
+    expect(
+      back.summary,
+      '4 quarters × 12.5 min · 7 on field · sub every 6.5 min · extra player if down by more than 4',
+    );
     // Missing fields fall back to sensible defaults.
     // Older docs stored whole minutes as ints.
     expect(League.fromJson('o', {'periodMinutes': 20}).periodMinutes, 20.0);

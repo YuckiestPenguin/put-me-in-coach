@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import 'league.dart';
 import 'player.dart';
+import 'team.dart';
 
 /// The whole game in one place: roster, clock, fairness tracking, and the
 /// 5-minute "sub is due" alert. Extends [ChangeNotifier] so the UI rebuilds
@@ -31,13 +33,74 @@ class GameState extends ChangeNotifier {
   /// before a game. Not saved: reopening the app lands on the home screen.
   bool settingUp = false;
 
+  /// Start setting up a fresh game from home: no team, league or roster
+  /// chosen yet.
   void beginSetup() {
     settingUp = true;
+    roster.clear();
+    teamId = teamName = leagueId = leagueName = null;
+    extraPlayerTrailingBy = null;
+    _save();
     notifyListeners();
   }
 
   void cancelSetup() {
     settingUp = false;
+    notifyListeners();
+  }
+
+  /// The team and league chosen for this game (null for a one-off game). The
+  /// names are kept alongside the ids so a saved game still reads correctly if
+  /// the team or league is later renamed or deleted.
+  String? teamId;
+  String? teamName;
+  String? leagueId;
+  String? leagueName;
+
+  /// League rule: an extra player is allowed when trailing by more than this.
+  int? extraPlayerTrailingBy;
+
+  /// Use [team]'s roster for this game, replacing the current one. Players
+  /// start fresh (present, no time or goals); edits made in setup apply to
+  /// this game only, never back to the team.
+  void applyTeam(Team team) {
+    roster
+      ..clear()
+      ..addAll(team.players.map((p) => Player.fromJson(p.toTeamJson())));
+    _sortRoster();
+    teamId = team.id;
+    teamName = team.name;
+    _save();
+    notifyListeners();
+  }
+
+  /// Back to a one-off game: no team and an empty roster.
+  void clearTeam() {
+    roster.clear();
+    teamId = teamName = null;
+    _save();
+    notifyListeners();
+  }
+
+  /// Take [league]'s rules for this game. They can still be tweaked in game
+  /// settings afterwards.
+  void applyLeague(League league) {
+    periodCount = league.periodCount;
+    periodMinutes = league.periodMinutes;
+    onFieldTarget = league.playersOnField;
+    subIntervalSeconds = (league.subIntervalMinutes * 60).round();
+    extraPlayerTrailingBy = league.extraPlayerTrailingBy;
+    leagueId = league.id;
+    leagueName = league.name;
+    _save();
+    notifyListeners();
+  }
+
+  /// Back to custom rules; the current numbers are kept.
+  void clearLeague() {
+    leagueId = leagueName = null;
+    extraPlayerTrailingBy = null;
+    _save();
     notifyListeners();
   }
 
@@ -61,6 +124,8 @@ class GameState extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     roster.clear();
+    teamId = teamName = leagueId = leagueName = null;
+    extraPlayerTrailingBy = null;
     onFieldTarget = 7;
     gameStarted = false;
     clockRunning = false;
@@ -135,7 +200,6 @@ class GameState extends ChangeNotifier {
     if (number != null && (number < 0 || hasNumber(number))) return;
     roster.add(Player(id: _nextId(), name: trimmed, number: number));
     _sortRoster();
-    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -145,7 +209,6 @@ class GameState extends ChangeNotifier {
 
   void removePlayer(int id) {
     roster.removeWhere((p) => p.id == id);
-    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -162,7 +225,6 @@ class GameState extends ChangeNotifier {
     p.name = trimmed;
     p.number = number;
     _sortRoster();
-    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -214,7 +276,6 @@ class GameState extends ChangeNotifier {
       p.setRole(role, false);
     }
     target.setRole(role, turningOn);
-    onRosterChanged?.call();
     _save();
     notifyListeners();
   }
@@ -442,29 +503,15 @@ class GameState extends ChangeNotifier {
 
   // ---- Persistence (wired in main.dart) ----------------------------------
 
-  /// Called when the roster itself changes (add/remove/edit/roles) so it can
-  /// be synced to the cloud. Deliberately not fired by clock ticks.
-  void Function()? onRosterChanged;
-
   /// Called once when a game ends, with its summary, so it can be stored.
   void Function(Map<String, dynamic> summary)? onGameEnded;
 
-  /// Roster as team data (no per-game state like time or goals).
-  List<Map<String, dynamic>> rosterToTeamJson() =>
-      [for (final p in roster) p.toTeamJson()];
-
-  /// Replace the roster with team data from the cloud (fresh per-game state).
-  void loadTeamFromJson(List<dynamic> players) {
-    roster
-      ..clear()
-      ..addAll(players.map((e) => Player.fromJson(e as Map<String, dynamic>)));
-    _sortRoster();
-    _save();
-    notifyListeners();
-  }
-
   /// A plain-data record of the finished game.
   Map<String, dynamic> summaryJson() => {
+        'teamId': teamId,
+        'teamName': teamName,
+        'leagueId': leagueId,
+        'leagueName': leagueName,
         'startedAt': startedAt?.toIso8601String(),
         'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
@@ -490,6 +537,11 @@ class GameState extends ChangeNotifier {
         'clockRunning': clockRunning,
         'gameEnded': gameEnded,
         'ownerUid': ownerUid,
+        'teamId': teamId,
+        'teamName': teamName,
+        'leagueId': leagueId,
+        'leagueName': leagueName,
+        'extraPlayerTrailingBy': extraPlayerTrailingBy,
         'startedAt': startedAt?.toIso8601String(),
         'endedAt': endedAt?.toIso8601String(),
         'gameSeconds': gameSeconds,
@@ -506,6 +558,11 @@ class GameState extends ChangeNotifier {
     clockRunning = json['clockRunning'] as bool? ?? false;
     gameEnded = json['gameEnded'] as bool? ?? false;
     ownerUid = json['ownerUid'] as String?;
+    teamId = json['teamId'] as String?;
+    teamName = json['teamName'] as String?;
+    leagueId = json['leagueId'] as String?;
+    leagueName = json['leagueName'] as String?;
+    extraPlayerTrailingBy = json['extraPlayerTrailingBy'] as int?;
     startedAt = DateTime.tryParse(json['startedAt'] as String? ?? '');
     endedAt = DateTime.tryParse(json['endedAt'] as String? ?? '');
     gameSeconds = json['gameSeconds'] as int? ?? 0;
