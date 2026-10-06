@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#2E7D32",
     "theme_color": "#2E7D32",
-    "description": "A new Flutter project.",
+    "description": "Kids soccer playing-time and substitution tracker.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

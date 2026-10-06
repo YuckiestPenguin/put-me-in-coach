@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/cloud_sync.dart';
 import '../util/format.dart';
 import '../widgets/game_summary_sheet.dart';
+import '../widgets/slow_load_notice.dart';
 
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -11,26 +12,81 @@ const _months = [
 ];
 
 /// Past games, newest first. Tap one for its summary; swipe to delete.
-class GameHistoryList extends StatelessWidget {
+class GameHistoryList extends StatefulWidget {
   const GameHistoryList({super.key});
+
+  @override
+  State<GameHistoryList> createState() => _GameHistoryListState();
+}
+
+class _GameHistoryListState extends State<GameHistoryList> {
+  CloudSync? _sync;
+  Stream<List<({String id, Map<String, dynamic> data})>>? _games;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _sync = CloudSync(uid);
+      _games = _sync!.gamesStream();
+    }
+  }
+
+  /// Re-subscribe, e.g. after a stalled connection.
+  void _retry() => setState(() => _games = _sync!.gamesStream());
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this game?'),
+        content: const Text('This removes it from your history for good.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    final sync = uid == null ? null : CloudSync(uid);
-
-    if (sync == null) {
+    final sync = _sync;
+    if (sync == null || _games == null) {
       return const Center(child: Text('Sign in to see past games.'));
     }
     return StreamBuilder(
-      stream: sync.gamesStream(),
+      stream: _games,
       builder: (context, snap) {
         if (snap.hasError) {
-          return const Center(child: Text("Couldn't load games."));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Couldn't load games."),
+                  const SizedBox(height: 8),
+                  Text('${snap.error}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: scheme.outline, fontSize: 12)),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                      onPressed: _retry, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          );
         }
         if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return SlowLoadNotice(onRetry: _retry, diagnose: sync.probe);
         }
         final games = snap.data!;
         if (games.isEmpty) {
@@ -61,25 +117,6 @@ class GameHistoryList extends StatelessWidget {
         );
       },
     );
-  }
-
-  Future<bool> _confirmDelete(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete this game?'),
-        content: const Text('This removes it from your history for good.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
-        ],
-      ),
-    );
-    return ok ?? false;
   }
 }
 

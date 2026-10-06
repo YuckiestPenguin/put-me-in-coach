@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart' hide Persistence;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,10 +22,26 @@ const _env = String.fromEnvironment('ENV', defaultValue: 'dev');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Release builds swallow errors silently; print them so they show up in the
+  // browser console.
+  FlutterError.onError = (details) =>
+      debugPrint('FlutterError: ${details.exceptionAsString()}\n${details.stack}');
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught: $error\n$stack');
+    return true;
+  };
   await Firebase.initializeApp(
     options: _env == 'prod'
         ? ProdFirebaseOptions.currentPlatform
         : DevFirebaseOptions.currentPlatform,
+  );
+
+  // Keep a local copy of the data so lists open instantly and work offline at
+  // the field, and fall back to long-polling on networks and browsers that
+  // block Firestore's default streaming connection.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    webExperimentalAutoDetectLongPolling: true,
   );
 
   final state = GameState();

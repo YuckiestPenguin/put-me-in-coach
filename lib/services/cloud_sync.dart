@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:firebase_core/firebase_core.dart';
 
 import '../models/game_state.dart';
 import '../models/league.dart';
@@ -107,6 +111,27 @@ class CloudSync {
       'players': players,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// One-shot check that Firestore is reachable and readable, for showing why
+  /// a screen is stuck loading. Returns a short human-readable result.
+  Future<String> probe() async {
+    final project = Firebase.app().options.projectId;
+    try {
+      final snap = await _games
+          .limit(1)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 10));
+      return '[$project] Server reachable; read OK (${snap.docs.length} sample game).';
+    } on TimeoutException {
+      return '[$project] Timed out after 10s waiting for Firestore.';
+    } on FirebaseException catch (e, st) {
+      debugPrint('Firestore probe failed: ${e.code} ${e.message}\n$st');
+      return '[$project] ${e.code}: ${e.message}';
+    } catch (e, st) {
+      debugPrint('Firestore probe failed: $e\n$st');
+      return '[$project] $e';
+    }
   }
 
   /// Finished games, newest first. Includes games saved offline that haven't
