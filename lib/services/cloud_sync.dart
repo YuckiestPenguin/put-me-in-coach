@@ -21,6 +21,17 @@ class CloudSync {
   final String uid;
   CloudSync(this.uid);
 
+  /// Called with a coach-readable message when a save or delete fails for good
+  /// (e.g. rules rejected it). Offline writes don't land here: Firestore
+  /// queues them and the games list marks them as not yet synced.
+  static void Function(String message)? onError;
+
+  static void _report(String what, Object e, StackTrace st) {
+    debugPrint('Cloud sync: $what failed: $e\n$st');
+    final detail = e is FirebaseException ? e.code : e;
+    onError?.call("Couldn't $what ($detail).");
+  }
+
   DocumentReference<Map<String, dynamic>> get _rosterDoc =>
       FirebaseFirestore.instance.doc('users/$uid/team/roster');
 
@@ -136,15 +147,26 @@ class CloudSync {
 
   /// Finished games, newest first. Includes games saved offline that haven't
   /// reached the server yet.
-  Stream<List<({String id, Map<String, dynamic> data})>> gamesStream() =>
-      _games.orderBy('startedAt', descending: true).snapshots().map((s) => [
-            for (final d in s.docs) (id: d.id, data: d.data()),
-          ]);
+  /// `pending` is true until the server has acknowledged the game.
+  Stream<List<({String id, Map<String, dynamic> data, bool pending})>>
+      gamesStream() => _games
+          .orderBy('startedAt', descending: true)
+          .snapshots(includeMetadataChanges: true)
+          .map((s) => [
+                for (final d in s.docs)
+                  (
+                    id: d.id,
+                    data: d.data(),
+                    pending: d.metadata.hasPendingWrites,
+                  ),
+              ]);
 
   Future<void> deleteGame(String id) async {
     try {
       await _games.doc(id).delete();
-    } catch (_) {}
+    } catch (e, st) {
+      _report('delete the game', e, st);
+    }
   }
 
   /// Connects [state] to the cloud: one-time migrations of pre-existing local
@@ -157,7 +179,9 @@ class CloudSync {
     }
     try {
       await _migrateDefaultTeam();
-    } catch (_) {}
+    } catch (_) {
+      // Same as above; the migration retries on the next launch.
+    }
     state.onGameEnded = saveGame;
   }
 
@@ -168,6 +192,8 @@ class CloudSync {
   Future<void> saveGame(Map<String, dynamic> summary) async {
     try {
       await _games.add({...summary, 'savedAt': FieldValue.serverTimestamp()});
-    } catch (_) {}
+    } catch (e, st) {
+      _report('save the finished game', e, st);
+    }
   }
 }

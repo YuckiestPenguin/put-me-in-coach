@@ -54,6 +54,8 @@ Future<void> main() async {
   );
 }
 
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class CoachApp extends StatefulWidget {
   const CoachApp({super.key});
 
@@ -64,6 +66,14 @@ class CoachApp extends StatefulWidget {
 class _CoachAppState extends State<CoachApp> {
   CloudSync? _sync;
   String? _syncedUid;
+
+  @override
+  void initState() {
+    super.initState();
+    CloudSync.onError = (message) => _messengerKey.currentState
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   /// Starts (or stops) cloud sync when the signed-in user changes.
   void _onUser(GameState state, User? user) {
@@ -83,6 +93,7 @@ class _CoachAppState extends State<CoachApp> {
     final state = context.read<GameState>();
     return MaterialApp(
       title: 'Put Me In, Coach',
+      scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

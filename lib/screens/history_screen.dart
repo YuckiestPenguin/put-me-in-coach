@@ -21,7 +21,7 @@ class GameHistoryList extends StatefulWidget {
 
 class _GameHistoryListState extends State<GameHistoryList> {
   CloudSync? _sync;
-  Stream<List<({String id, Map<String, dynamic> data})>>? _games;
+  Stream<List<({String id, Map<String, dynamic> data, bool pending})>>? _games;
 
   @override
   void initState() {
@@ -111,7 +111,7 @@ class _GameHistoryListState extends State<GameHistoryList> {
               ),
               confirmDismiss: (_) => _confirmDelete(context),
               onDismissed: (_) => sync.deleteGame(g.id),
-              child: _GameTile(data: g.data),
+              child: _GameTile(data: g.data, pending: g.pending),
             );
           },
         );
@@ -122,7 +122,8 @@ class _GameHistoryListState extends State<GameHistoryList> {
 
 class _GameTile extends StatelessWidget {
   final Map<String, dynamic> data;
-  const _GameTile({required this.data});
+  final bool pending;
+  const _GameTile({required this.data, required this.pending});
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +144,13 @@ class _GameTile extends StatelessWidget {
         '$present players',
         '$goals goals',
       ].join(' · ')),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: pending
+          ? Tooltip(
+              message: 'Not synced yet',
+              child: Icon(Icons.cloud_off,
+                  size: 20, color: Theme.of(context).colorScheme.outline),
+            )
+          : const Icon(Icons.chevron_right),
       onTap: () => GameSummarySheet.showSummary(context, data),
     );
   }
