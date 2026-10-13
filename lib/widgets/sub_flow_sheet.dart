@@ -7,10 +7,11 @@ import '../util/format.dart';
 import 'player_badges.dart';
 
 /// The two-step substitution flow shown as a modal sheet:
-///   Step 1 — pick bench players to bring ON  (least-played surfaced first)
-///   Step 2 — pick field players to take OFF  (most-played surfaced first)
+///   Step 1 — pick field players to take OFF  (most-played surfaced first)
+///   Step 2 — pick bench players to bring ON  (least-played surfaced first)
 /// Confirm applies the swap. Taking off fewer than came on is allowed (an extra
 /// player when trailing by more than 4); the on-field target grows to match.
+/// Taking off no one is allowed too, to just add players.
 class SubFlowSheet extends StatefulWidget {
   final GameState state;
 
@@ -44,7 +45,7 @@ class SubFlowSheet extends StatefulWidget {
 }
 
 class _SubFlowSheetState extends State<SubFlowSheet> {
-  int _step = 1; // 1 = bring on, 2 = take off
+  int _step = 1; // 1 = take off, 2 = bring on
   final Set<int> _on = {};
   final Set<int> _off = {};
 
@@ -55,7 +56,7 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bringingOn = _step == 1;
+    final bringingOn = _step == 2;
     final goalie = widget.state.goalieOnField;
     final players = bringingOn
         ? widget.state.benchSortedByLeastPlayed
@@ -104,8 +105,10 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
           const SizedBox(height: 4),
           Text(
             bringingOn
-                ? 'Subs who have played the least are first. You don\'t have to '
-                    'take anyone off.'
+                ? (_off.isEmpty
+                    ? 'Subs who have played the least are first.'
+                    : 'Subs who have played the least are first. Pick '
+                        '${_off.length} to replace the ${_off.length} coming off.')
                 : (goalie != null
                     ? 'Most-played first. The goalie 🧤 is exempt.'
                     : 'Players who have played the most are first.'),
@@ -195,37 +198,37 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
           Expanded(
             flex: 2,
             child: FilledButton(
-              onPressed: _on.isEmpty
-                  ? null
-                  : () => setState(() => _step = 2),
+              onPressed: () => setState(() => _step = 2),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: Text('Next  (${_on.length} on)'),
+              child: Text(_off.isEmpty
+                  ? 'Next  (no one off)'
+                  : 'Next  (${_off.length} off)'),
             ),
           ),
         ],
       );
     }
 
-    final matched = _off.length <= _on.length;
+    final tooFew = _on.length < _off.length;
     final extra = _on.length - _off.length;
     return Column(
       children: [
-        if (!matched)
+        if (tooFew)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Pick at most ${_on.length} to take off (selected ${_off.length}).',
+              'Pick at least ${_off.length} to bring on (selected ${_on.length}).',
               style: TextStyle(color: scheme.error, fontSize: 13),
             ),
           )
-        else if (extra > 0)
+        else if (extra > 0 && _on.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Taking off ${_off.length} — $extra extra on the field '
-              '(allowed when trailing by more than 4).',
+              'Bringing on ${_on.length} for ${_off.length} off — $extra extra '
+              'on the field (allowed when trailing by more than 4).',
               style: TextStyle(color: scheme.outline, fontSize: 13),
             ),
           ),
@@ -244,7 +247,7 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
             Expanded(
               flex: 2,
               child: FilledButton(
-                onPressed: matched
+                onPressed: _on.isNotEmpty && !tooFew
                     ? () {
                         widget.state.applySwap(_on.toList(), _off.toList());
                         Navigator.of(context).pop();
@@ -253,7 +256,8 @@ class _SubFlowSheetState extends State<SubFlowSheet> {
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: Text(_off.isEmpty ? 'Add without taking off' : 'Confirm Swap'),
+                child: Text(
+                    _off.isEmpty ? 'Add without taking off' : 'Confirm Swap'),
               ),
             ),
           ],
